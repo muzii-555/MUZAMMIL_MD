@@ -1,87 +1,76 @@
-const os = require('os');
-const config = require('../config');
-const { cmd } = require('../command');
+const { cmd } = require("../command");
+const os = require("os");
 
-// Legendary name rotations
-const botNameStyles = [
-  "𝐌𝐔𝐙𝐀𝐌𝐌𝐈𝐋-𝐌𝐃",
-  "𝕄𝕌ℤ𝔸𝕄𝕄𝕀𝕃-𝕄𝔻",
-  "𝓜𝓤𝓩𝓐𝓜𝓜𝓘𝓛-𝓜𝓓",
-  "ⱮԱɀȺⱮⱮįꝈ-ⱮᎠ",
-  "爪ㄩ乙卂爪爪丨ㄥ-爪ᗪ"
-];
-
-let index = 0;
+function formatUptime(seconds) {
+  seconds = Number(seconds);
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor(seconds % (3600 * 24) / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
+  const s = Math.floor(seconds % 60);
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
 
 cmd({
   pattern: "ping",
-  alias: ["speed","alive","status"],
-  desc: "Legendary cinematic ping",
-  category: "main",
+  alias: ["speed", "pong", "godping"],
   react: "⚡",
+  desc: "Activate God Mode Ping",
+  category: "main",
   filename: __filename
 },
-async (conn, mek, m, { from, sender, reply }) => {
+async (conn, mek, m, { from }) => {
   try {
-    // 1️⃣ PINGING phase
-    const pingingMsg = await conn.sendMessage(from, {
-      text: "*⚡ P I N G I N G . . .*"
-    }, { quoted: mek });
 
     const start = Date.now();
 
-    // Small cinematic delay
-    await new Promise(res => setTimeout(res, 600));
-
-    // 2️⃣ Calculate ping
-    const ping = Date.now() - start;
-
-    const uptime = process.uptime();
-    const upM = Math.floor(uptime / 60);
-    const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
-
-    const fancyName = botNameStyles[index];
-    index = (index + 1) % botNameStyles.length;
-
-    const reacts = ['👑','⚡','🔥','💎','🚀','🌌'];
-    const reactEmoji = reacts[Math.floor(Math.random() * reacts.length)];
-
-    // React on pinging message
+    // Step 1 – Boot Animation
     await conn.sendMessage(from, {
-      react: { text: reactEmoji, key: pingingMsg.key }
-    });
+      text: "```⚡ Booting MUZAMMIL-MD God Engine...```"
+    }, { quoted: m });
 
-    // 3️⃣ Legendary result
-    const text = `
-*╔═══〔 👑 𝐋𝐄𝐆𝐄𝐍𝐃𝐀𝐑𝐘 𝐏𝐈𝐍𝐆 〕═══╗*
-*║ ⟬ ${fancyName} ⟭*
-*║────────────────────────*
-*║ ⚡ 𝐒𝐏𝐄𝐄𝐃   : ${ping}ms*
-*║ 🟢 𝐒𝐓𝐀𝐓𝐔𝐒  : ONLINE*
-*║ 🕒 𝐔𝐏𝐓𝐈𝐌𝐄 : ${upM} min*
-*║ 🧠 𝐑𝐀𝐌     : ${ram} MB*
-*║ 📦 𝐕𝐄𝐑𝐒𝐈𝐎𝐍 : v5.0.0*
-*╚════════════════════════╝*
+    await new Promise(r => setTimeout(r, 700));
 
-> 💎 ᴘᴏᴡᴇʀᴇᴅ ʙʏ **𝐌𝐔𝐙𝐀𝐌𝐌𝐈𝐋-𝐌𝐃**
-`;
+    // Step 2 – Scanning Animation
+    await conn.sendMessage(from, {
+      text: "```🧬 Scanning System Resources...```"
+    }, { quoted: m });
+
+    await new Promise(r => setTimeout(r, 700));
+
+    const end = Date.now();
+    const speed = end - start;
+
+    // System Info
+    const uptime = formatUptime(process.uptime());
+    const usedRam = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
+    const totalRam = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
+    const cpuModel = os.cpus()[0].model;
+    const cpuCores = os.cpus().length;
+    const platform = os.platform();
+    const nodeVersion = process.version;
+
+    // Final Legendary Output
+    const result = `
+╔═══〔 👑 𝗠𝗨𝗭𝗔𝗠𝗠𝗜𝗟-𝗠𝗗 𝗚𝗢𝗗 𝗠𝗢𝗗𝗘 〕═══╗
+║ ⚡ 𝗦𝗣𝗘𝗘𝗗        : ${speed} ms
+║ ⏳ 𝗨𝗣𝗧𝗜𝗠𝗘      : ${uptime}
+║ 🧠 𝗥𝗔𝗠 𝗨𝗦𝗘𝗗    : ${usedRam} MB / ${totalRam} GB
+║ 🖥 𝗣𝗟𝗔𝗧𝗙𝗢𝗥𝗠    : ${platform}
+║ 🧬 𝗖𝗣𝗨         : ${cpuCores} Cores
+║ 💻 𝗡𝗢𝗗𝗘        : ${nodeVersion}
+║ 🔥 𝗦𝗧𝗔𝗧𝗨𝗦      : GOD MODE ACTIVE
+╚══════════════════════════════╝
+
+> 🚀 Powered By MUZAMMIL-MD 👑`;
 
     await conn.sendMessage(from, {
-      text,
-      contextInfo: {
-        mentionedJid: [sender],
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterJid: '120363403831162407@newsletter',
-          newsletterName: "MUZAMMIL-MD LEGENDARY",
-          serverMessageId: 888
-        }
-      }
-    }, { quoted: pingingMsg });
+      text: result
+    }, { quoted: m });
 
-  } catch (e) {
-    console.log(e);
-    reply("❌ Legendary ping failed");
+  } catch (error) {
+    console.log("God Ping Error:", error);
+    await conn.sendMessage(from, {
+      text: "❌ God Mode Failed!"
+    }, { quoted: m });
   }
 });
