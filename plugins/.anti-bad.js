@@ -4,29 +4,23 @@ const fs = require("fs");
 
 const MAX_STRIKES = 3;
 const DB_FILE = "./vip_warnings.json";
-const OWNER_NUMBER = "923XXXXXXXXX@s.whatsapp.net"; // apna number dalna
+const OWNER_NUMBER = "923XXXXXXXXX@s.whatsapp.net"; // apna number
 
-// ================= LOAD DATABASE SAFELY =================
 let warnings = {};
-try {
-  if (fs.existsSync(DB_FILE)) {
-    const data = fs.readFileSync(DB_FILE, "utf8");
-    warnings = JSON.parse(data || "{}");
+
+// Load DB
+if (fs.existsSync(DB_FILE)) {
+  try {
+    warnings = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  } catch {
+    warnings = {};
   }
-} catch (err) {
-  console.log("DB Load Error, resetting...");
-  warnings = {};
 }
 
 function saveDB() {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(warnings, null, 2));
-  } catch (err) {
-    console.log("DB Save Error:", err);
-  }
+  fs.writeFileSync(DB_FILE, JSON.stringify(warnings, null, 2));
 }
 
-// ================= BAD WORD LIST =================
 const badWords = [
   "fuck","bitch","asshole","bastard",
   "madarchod","behenchod","chutiya",
@@ -34,81 +28,48 @@ const badWords = [
   "wtf","xxx","sex"
 ];
 
-// Escape regex safe
-function escapeRegex(word) {
-  return word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+const badWordRegex = new RegExp(badWords.join("|"), "i");
 
-// Smart spaced detection (f.u.c.k / f u c k)
-const badWordRegex = new RegExp(
-  badWords
-    .map(w => escapeRegex(w).split("").join("\\W*"))
-    .join("|"),
-  "i"
-);
-
-// ================= MAIN HANDLER =================
 cmd({
   on: "body"
-}, async (conn, m, store, {
-  from,
-  body,
-  isGroup,
-  isAdmins,
-  isBotAdmins,
-  sender
-}) => {
+}, async (conn, m, store, { from, isGroup, sender }) => {
+
   try {
 
-    // Proper config check
-    if (!config.ANTI_BAD_WORD || config.ANTI_BAD_WORD === "false") return;
-    if (!isGroup || !isBotAdmins || !body) return;
-    if (sender === OWNER_NUMBER) return;
+    if (!config.ANTI_BAD_WORD) return;
+    if (!isGroup) return;
+    if (!m.text) return;
+
+    const metadata = await conn.groupMetadata(from);
+    const admins = metadata.participants
+      .filter(p => p.admin)
+      .map(p => p.id);
+
+    const isAdmins = admins.includes(sender);
+    const isBotAdmins = admins.includes(conn.user.id);
+
+    if (!isBotAdmins) return;
     if (isAdmins) return;
+    if (sender === OWNER_NUMBER) return;
 
-    if (!badWordRegex.test(body)) return;
+    if (!badWordRegex.test(m.text)) return;
 
-    // Delete message
-    try {
-      await conn.sendMessage(from, { delete: m.key });
-    } catch (e) {
-      console.log("Delete Failed");
-    }
+    // Delete Message
+    await conn.sendMessage(from, {
+      delete: m.key
+    });
 
     if (!warnings[sender]) warnings[sender] = 0;
     warnings[sender]++;
+
     saveDB();
 
     let count = warnings[sender];
-    let username = sender.split("@")[0];
 
-    let warningText = "";
-
-    if (count === 1) {
-      warningText = `
-╔═══〔 ⚠ VIP WARNING 1 ⚠ 〕═══╗
-┃ 👤 @${username}
-┃ ❗ Please avoid abusive words
-╚══════════════════════╝`;
-    }
-
-    else if (count === 2) {
-      warningText = `
-╔═══〔 ⚠ VIP WARNING 2 ⚠ 〕═══╗
-┃ 👤 @${username}
-┃ 🚫 Last chance! Control language
-╚══════════════════════╝`;
-    }
-
-    else if (count >= MAX_STRIKES) {
-      warningText = `
-╔═══〔 ⛔ FINAL WARNING ⛔ 〕═══╗
-┃ 👤 @${username}
-┃ ❌ Removed from group
-╚══════════════════════╝`;
+    if (count >= MAX_STRIKES) {
 
       await conn.sendMessage(from, {
-        text: warningText,
+        text: `⛔ @${sender.split("@")[0]} removed for abusive language.`,
         mentions: [sender]
       });
 
@@ -120,11 +81,11 @@ cmd({
     }
 
     await conn.sendMessage(from, {
-      text: warningText,
+      text: `⚠ Warning ${count}/3 @${sender.split("@")[0]}`,
       mentions: [sender]
-    }, { quoted: m });
+    });
 
   } catch (err) {
-    console.error("VIP Warning System Error:", err);
+    console.log("ERROR:", err);
   }
 });
