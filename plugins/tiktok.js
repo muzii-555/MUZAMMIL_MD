@@ -1,113 +1,288 @@
-const fetch = require("node-fetch");
 const { cmd } = require("../command");
+const axios = require("axios");
+const crypto = require("crypto");
+const Buffer = require("buffer").Buffer;
 
-/* ========= CONFIG ========= */
-
-const CONFIG = {
-    api: "https://arslanmd-api.vercel.app/api/ttdl?url=",
-    cooldown: 4000
+// === Encryption / Decryption Keys ===
+const KEY_MAP = {
+  enc: "GJvE5RZIxrl9SuNrAtgsvCfWha3M7NGC",
+  dec: "H3quWdWoHLX5bZSlyCYAnvDFara25FIu",
 };
 
-let lastUsed = 0;
+// === Crypto Handler ===
+const cryptoProc = (type, data) => {
+  const key = Buffer.from(KEY_MAP[type], "utf8");
+  const iv = Buffer.from(KEY_MAP[type].slice(0, 16), "utf8");
 
-function isCooldown() {
-    return Date.now() - lastUsed < CONFIG.cooldown;
-}
+  const cipherFn =
+    type === "enc" ? crypto.createCipheriv : crypto.createDecipheriv;
+  const cipher = cipherFn("aes-256-cbc", key, iv);
 
-function activateCooldown() {
-    lastUsed = Date.now();
-}
+  let output =
+    type === "enc"
+      ? cipher.update(data, "utf8", "base64")
+      : cipher.update(data, "base64", "utf8");
 
-function isValidTikTok(url) {
-    return /tiktok\.com/.test(url);
-}
+  output += cipher.final(type === "enc" ? "base64" : "utf8");
+  return output;
+};
 
-/* ========= COMMAND ========= */
+// === Savetik Encrypted TikTok Downloader ===
+async function tiktokCrypto(url) {
+  if (!/tiktok\.com/.test(url)) throw new Error("Invalid TikTok URL.");
 
-cmd({
-    pattern: "tt",
-    alias: ["tiktok", "ttdl"],
-    desc: "MUZAMMIL-MD VIP TikTok Downloader",
-    category: "download",
-    react: "🎬",
-    filename: __filename
-},
-async (conn, mek, m, { from, reply, q, sender, pushname }) => {
+  const encrypted = cryptoProc("enc", url);
 
-    try {
-
-        if (!q)
-            return reply("❌ Provide TikTok URL\nExample:\n.tt https://tiktok.com/xxxx");
-
-        if (!isValidTikTok(q))
-            return reply("❌ Invalid TikTok URL");
-
-        if (isCooldown())
-            return reply("⏳ Wait a few seconds before using again.");
-
-        activateCooldown();
-
-        await conn.sendMessage(from, {
-            react: { text: "⏳", key: m.key }
-        });
-
-        const res = await fetch(CONFIG.api + encodeURIComponent(q));
-        const data = await res.json();
-
-        if (!data || !data.status)
-            throw new Error("API response invalid");
-
-        const videoUrl =
-            data.data?.hd ||
-            data.data?.play ||
-            data.data?.nowm;
-
-        if (!videoUrl)
-            throw new Error("Video not found");
-
-        const quality = data.data?.hd ? "HD Quality" : "Standard Quality";
-        const title = data.data?.title || "No Title";
-        const views = data.data?.views || "N/A";
-
-        const box = `
-╭─────────────────────────────╮
-│        🎬  MUZAMMIL-MD VIP        │
-├─────────────────────────────┤
-│ 👤 User     : ${pushname}
-│ 🆔 User ID  : ${sender.split("@")[0]}
-│
-│ 📥 Status   : Download Ready
-│ 🎞 Quality  : ${quality}
-│ 👀 Views    : ${views}
-├─────────────────────────────┤
-│ 📝 Title :
-│ ${title}
-├─────────────────────────────┤
-│ ⚡ Powered By MUZAMMIL-MD
-╰─────────────────────────────╯
-`.trim();
-
-        await conn.sendMessage(from, {
-            video: { url: videoUrl },
-            caption: box
-        }, { quoted: mek });
-
-        await conn.sendMessage(from, {
-            react: { text: "✅", key: m.key }
-        });
-
-    } catch (err) {
-
-        await conn.sendMessage(from, {
-            react: { text: "❌", key: m.key }
-        });
-
-        reply(`
-╭────────────────────╮
-│    ❌ DOWNLOAD FAILED    │
-╰────────────────────╯
-
-${err.message}
-        `.trim());
+  const { data } = await axios.post(
+    "https://savetik.app/requests",
+    { bdata: encrypted },
+    {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36",
+        "Content-Type": "application/json",
+      },
+      timeout: 25000,
     }
-});
+  );
+
+  if (!data || data.status !== "success")
+    throw new Error(data.message || "API Error.");
+
+  const decryptedVideo = cryptoProc("dec", data.data);
+
+  return {
+    title: data.title || "Unknown",
+    author: data.username || "Unknown",
+    thumbnail: data.thumbnailUrl || "",
+    video: decryptedVideo,
+    audio: data.mp3 || null,
+  };
+}
+
+// === Reliable video downloader (ALWAYS playable MP4) ===
+async function fetchPlayableVideo(url) {
+  const res = await axios.get(url, {
+    responseType: "arraybuffer",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36",
+    },
+  });
+  return Buffer.from(res.data);
+}
+
+// === COMMAND HANDLER: TikTok Download ===
+cmd(
+  {
+    pattern: "tiktok",
+    alias: ["tt", "tttt", "tiktokdl", "ttdl"],
+    desc: "Download TikTok videos with encrypted API (Fully Playable)",
+    react: "🔐",
+    category: "downloader",
+    filename: __filename,
+  },
+  async (conn, m, store, { args, from, reply, sender }) => {
+    try {
+      if (!args[0] || !/tiktok\.com/.test(args[0])) {
+        const helpMsg = 
+`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸* 🎬 *TIKTOK DOWNLOADER*
+*┇▸* 📌 Usage: .tiktok <url>
+*┇▸* 📌 Alias: .tt .tttt .ttdl
+*┇▸* 🔐 Encrypted API System
+*┇▸* 👑 Powered By MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
+        return reply(helpMsg);
+      }
+
+      const url = args[0];
+
+      await store.react("⌛");
+      reply("⏳ *🔐 Decrypting and preparing playable video...*");
+
+      const result = await tiktokCrypto(url);
+
+      // 🔥 Download into buffer (WhatsApp compatible)
+      const videoBuffer = await fetchPlayableVideo(result.video);
+
+      const caption = 
+`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸* 🎬 *TIKTOK VIDEO*
+*┇▸* 📌 Title: ${result.title}
+*┇▸* 👤 Author: @${result.author}
+*┇▸* ✅ Status: Downloaded
+*┇▸* 🔐 Type: Encrypted API
+*┇▸* 👑 MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
+
+      // === SEND VIDEO BUFFER ===
+      await conn.sendMessage(
+        from,
+        {
+          video: videoBuffer,
+          mimetype: "video/mp4",
+          caption: caption,
+          contextInfo: {
+            externalAdReply: {
+              title: result.title,
+              body: `By @${result.author}`,
+              thumbnailUrl: result.thumbnail,
+              sourceUrl: url,
+              mediaType: 1,
+              renderLargerThumbnail: true
+            }
+          }
+        },
+        { quoted: m }
+      );
+
+      // === SEND AUDIO ===
+      if (result.audio) {
+        const audioCaption = 
+`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸* 🎵 *TIKTOK AUDIO*
+*┇▸* 📌 Title: ${result.title}
+*┇▸* 👤 Author: @${result.author}
+*┇▸* 🎧 Format: MP3
+*┇▸* 👑 MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
+
+        await conn.sendMessage(
+          from,
+          {
+            audio: { url: result.audio },
+            mimetype: "audio/mpeg",
+            caption: audioCaption
+          },
+          { quoted: m }
+        );
+      }
+
+      await store.react("✅");
+      
+    } catch (err) {
+      console.error("TT Crypto Error:", err.message);
+      await store.react("❌");
+      
+      const errorMsg = 
+`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸* ❌ *DOWNLOAD FAILED*
+*┇▸* ⚠️ Error: ${err.message}
+*┇▸* 🔁 Try Again Later
+*┇▸* 👑 MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
+      
+      reply(errorMsg);
+    }
+  }
+);
+
+// === BONUS: TikTok Video Info (Without Download) ===
+cmd(
+  {
+    pattern: "ttinfo",
+    alias: ["tiktokinfo", "tiktoki"],
+    desc: "Get TikTok video information",
+    react: "ℹ️",
+    category: "downloader",
+    filename: __filename,
+  },
+  async (conn, m, store, { args, from, reply }) => {
+    try {
+      if (!args[0] || !/tiktok\.com/.test(args[0])) {
+        return reply("❌ *Please provide a valid TikTok URL*\n\nExample: .ttinfo https://tiktok.com/@user/video/xxxx");
+      }
+
+      const url = args[0];
+      await store.react("⌛");
+      
+      const result = await tiktokCrypto(url);
+      
+      const infoMsg = 
+`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸* ℹ️ *TIKTOK VIDEO INFO*
+*┇▸* 🎬 Title: ${result.title}
+*┇▸* 👤 Author: @${result.author}
+*┇▸* 🎵 Audio: ${result.audio ? "Available" : "Not Available"}
+*┇▸* 📊 Quality: High MP4
+*┇▸* 👑 MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
+
+      if (result.thumbnail) {
+        await conn.sendMessage(
+          from,
+          {
+            image: { url: result.thumbnail },
+            caption: infoMsg
+          },
+          { quoted: m }
+        );
+      } else {
+        reply(infoMsg);
+      }
+      
+      await store.react("✅");
+      
+    } catch (err) {
+      console.error("TT Info Error:", err.message);
+      await store.react("❌");
+      reply("❌ Error: " + err.message);
+    }
+  }
+);
+
+// === BONUS: TikTok Audio Only ===
+cmd(
+  {
+    pattern: "ttaudio",
+    alias: ["tiktoka", "tta"],
+    desc: "Download TikTok audio only",
+    react: "🎵",
+    category: "downloader",
+    filename: __filename,
+  },
+  async (conn, m, store, { args, from, reply }) => {
+    try {
+      if (!args[0] || !/tiktok\.com/.test(args[0])) {
+        return reply("❌ *Please provide a valid TikTok URL*\n\nExample: .ttaudio https://tiktok.com/@user/video/xxxx");
+      }
+
+      const url = args[0];
+      await store.react("⌛");
+      reply("⏳ *Extracting audio from TikTok video...*");
+      
+      const result = await tiktokCrypto(url);
+      
+      if (!result.audio) {
+        return reply("❌ *No audio available for this video*");
+      }
+      
+      const audioCaption = 
+`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸* 🎵 *TIKTOK AUDIO ONLY*
+*┇▸* 📌 Title: ${result.title}
+*┇▸* 👤 Author: @${result.author}
+*┇▸* 🎧 Format: MP3
+*┇▸* 👑 MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
+
+      await conn.sendMessage(
+        from,
+        {
+          audio: { url: result.audio },
+          mimetype: "audio/mpeg",
+          caption: audioCaption
+        },
+        { quoted: m }
+      );
+      
+      await store.react("✅");
+      
+    } catch (err) {
+      console.error("TT Audio Error:", err.message);
+      await store.react("❌");
+      reply("❌ Error: " + err.message);
+    }
+  }
+);
