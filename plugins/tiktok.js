@@ -1,288 +1,75 @@
 const { cmd } = require("../command");
 const axios = require("axios");
-const crypto = require("crypto");
-const Buffer = require("buffer").Buffer;
 
-// === Encryption / Decryption Keys ===
-const KEY_MAP = {
-  enc: "GJvE5RZIxrl9SuNrAtgsvCfWha3M7NGC",
-  dec: "H3quWdWoHLX5bZSlyCYAnvDFara25FIu",
-};
+cmd({
+  pattern: "tt",
+  alias: ["tiktok", "ttdl"],
+  react: "💞",
+  desc: "Premium TikTok Downloader",
+  category: "download",
+  filename: __filename
+},
+async (conn, mek, m, { from, q, reply }) => {
+  try {
 
-// === Crypto Handler ===
-const cryptoProc = (type, data) => {
-  const key = Buffer.from(KEY_MAP[type], "utf8");
-  const iv = Buffer.from(KEY_MAP[type].slice(0, 16), "utf8");
+    if (!q) return reply("❌ Janu TikTok link to do na... 💔");
 
-  const cipherFn =
-    type === "enc" ? crypto.createCipheriv : crypto.createDecipheriv;
-  const cipher = cipherFn("aes-256-cbc", key, iv);
+    // 💖 Romantic Processing Box
+    let processing = `
+*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸ 💖 Janu ap ki video aa rahi he...*
+*┇▸ 🎬 Ap ki video tayar ho rahi he...*
+*┇▸ ⏳ Thora sa intezar karo na...*
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+`;
 
-  let output =
-    type === "enc"
-      ? cipher.update(data, "utf8", "base64")
-      : cipher.update(data, "base64", "utf8");
+    await conn.sendMessage(from, { text: processing }, { quoted: mek });
+    await conn.sendMessage(from, { react: { text: "💘", key: mek.key } });
 
-  output += cipher.final(type === "enc" ? "base64" : "utf8");
-  return output;
-};
+    // 🔐 Secure Base64 Encode
+    const encodedUrl = Buffer.from(q).toString("base64");
 
-// === Savetik Encrypted TikTok Downloader ===
-async function tiktokCrypto(url) {
-  if (!/tiktok\.com/.test(url)) throw new Error("Invalid TikTok URL.");
+    const api = `https://arslanmd-api.vercel.app/api/ttdl?url=${encodedUrl}`;
+    const { data } = await axios.get(api);
 
-  const encrypted = cryptoProc("enc", url);
-
-  const { data } = await axios.post(
-    "https://savetik.app/requests",
-    { bdata: encrypted },
-    {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36",
-        "Content-Type": "application/json",
-      },
-      timeout: 25000,
+    if (!data || data.status !== true || !data.result) {
+      return reply("💔 Janu video nahi mili...");
     }
-  );
 
-  if (!data || data.status !== "success")
-    throw new Error(data.message || "API Error.");
+    const { title, caption, nowm, mp3, thumbnail } = data.result;
 
-  const decryptedVideo = cryptoProc("dec", data.data);
+    // 🎭 Final Stylish Box
+    let resultBox = `
+*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+*┇▸ 💖 Janu ap ki video aa gayi*
+*┇▸ 🎬 Title:* ${title || "Unknown"}
+*┇▸ 📝 Caption:* ${caption || "No caption"}
+*┇▸ 🔐 Mode:* Secure Base64
+*┇▸ 🚀 Powered By:* MUZAMMIL-MD
+*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
+`;
 
-  return {
-    title: data.title || "Unknown",
-    author: data.username || "Unknown",
-    thumbnail: data.thumbnailUrl || "",
-    video: decryptedVideo,
-    audio: data.mp3 || null,
-  };
-}
+    // 📸 Thumbnail + Info
+    await conn.sendMessage(from, {
+      image: { url: thumbnail },
+      caption: resultBox
+    }, { quoted: mek });
 
-// === Reliable video downloader (ALWAYS playable MP4) ===
-async function fetchPlayableVideo(url) {
-  const res = await axios.get(url, {
-    responseType: "arraybuffer",
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36",
-    },
-  });
-  return Buffer.from(res.data);
-}
+    // 🎥 Send Video
+    await conn.sendMessage(from, {
+      video: { url: nowm }
+    }, { quoted: mek });
 
-// === COMMAND HANDLER: TikTok Download ===
-cmd(
-  {
-    pattern: "tiktok",
-    alias: ["tt", "tttt", "tiktokdl", "ttdl"],
-    desc: "Download TikTok videos with encrypted API (Fully Playable)",
-    react: "🔐",
-    category: "downloader",
-    filename: __filename,
-  },
-  async (conn, m, store, { args, from, reply, sender }) => {
-    try {
-      if (!args[0] || !/tiktok\.com/.test(args[0])) {
-        const helpMsg = 
-`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
-*┇▸* 🎬 *TIKTOK DOWNLOADER*
-*┇▸* 📌 Usage: .tiktok <url>
-*┇▸* 📌 Alias: .tt .tttt .ttdl
-*┇▸* 🔐 Encrypted API System
-*┇▸* 👑 Powered By MUZAMMIL-MD
-*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
-        return reply(helpMsg);
-      }
+    // 🎵 Send MP3
+    await conn.sendMessage(from, {
+      audio: { url: mp3 },
+      mimetype: "audio/mpeg"
+    }, { quoted: mek });
 
-      const url = args[0];
+    await conn.sendMessage(from, { react: { text: "✅", key: mek.key } });
 
-      await store.react("⌛");
-      reply("⏳ *🔐 Decrypting and preparing playable video...*");
-
-      const result = await tiktokCrypto(url);
-
-      // 🔥 Download into buffer (WhatsApp compatible)
-      const videoBuffer = await fetchPlayableVideo(result.video);
-
-      const caption = 
-`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
-*┇▸* 🎬 *TIKTOK VIDEO*
-*┇▸* 📌 Title: ${result.title}
-*┇▸* 👤 Author: @${result.author}
-*┇▸* ✅ Status: Downloaded
-*┇▸* 🔐 Type: Encrypted API
-*┇▸* 👑 MUZAMMIL-MD
-*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
-
-      // === SEND VIDEO BUFFER ===
-      await conn.sendMessage(
-        from,
-        {
-          video: videoBuffer,
-          mimetype: "video/mp4",
-          caption: caption,
-          contextInfo: {
-            externalAdReply: {
-              title: result.title,
-              body: `By @${result.author}`,
-              thumbnailUrl: result.thumbnail,
-              sourceUrl: url,
-              mediaType: 1,
-              renderLargerThumbnail: true
-            }
-          }
-        },
-        { quoted: m }
-      );
-
-      // === SEND AUDIO ===
-      if (result.audio) {
-        const audioCaption = 
-`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
-*┇▸* 🎵 *TIKTOK AUDIO*
-*┇▸* 📌 Title: ${result.title}
-*┇▸* 👤 Author: @${result.author}
-*┇▸* 🎧 Format: MP3
-*┇▸* 👑 MUZAMMIL-MD
-*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
-
-        await conn.sendMessage(
-          from,
-          {
-            audio: { url: result.audio },
-            mimetype: "audio/mpeg",
-            caption: audioCaption
-          },
-          { quoted: m }
-        );
-      }
-
-      await store.react("✅");
-      
-    } catch (err) {
-      console.error("TT Crypto Error:", err.message);
-      await store.react("❌");
-      
-      const errorMsg = 
-`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
-*┇▸* ❌ *DOWNLOAD FAILED*
-*┇▸* ⚠️ Error: ${err.message}
-*┇▸* 🔁 Try Again Later
-*┇▸* 👑 MUZAMMIL-MD
-*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
-      
-      reply(errorMsg);
-    }
+  } catch (error) {
+    console.log(error);
+    reply("❌ System error... baad me try karo.");
   }
-);
-
-// === BONUS: TikTok Video Info (Without Download) ===
-cmd(
-  {
-    pattern: "ttinfo",
-    alias: ["tiktokinfo", "tiktoki"],
-    desc: "Get TikTok video information",
-    react: "ℹ️",
-    category: "downloader",
-    filename: __filename,
-  },
-  async (conn, m, store, { args, from, reply }) => {
-    try {
-      if (!args[0] || !/tiktok\.com/.test(args[0])) {
-        return reply("❌ *Please provide a valid TikTok URL*\n\nExample: .ttinfo https://tiktok.com/@user/video/xxxx");
-      }
-
-      const url = args[0];
-      await store.react("⌛");
-      
-      const result = await tiktokCrypto(url);
-      
-      const infoMsg = 
-`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
-*┇▸* ℹ️ *TIKTOK VIDEO INFO*
-*┇▸* 🎬 Title: ${result.title}
-*┇▸* 👤 Author: @${result.author}
-*┇▸* 🎵 Audio: ${result.audio ? "Available" : "Not Available"}
-*┇▸* 📊 Quality: High MP4
-*┇▸* 👑 MUZAMMIL-MD
-*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
-
-      if (result.thumbnail) {
-        await conn.sendMessage(
-          from,
-          {
-            image: { url: result.thumbnail },
-            caption: infoMsg
-          },
-          { quoted: m }
-        );
-      } else {
-        reply(infoMsg);
-      }
-      
-      await store.react("✅");
-      
-    } catch (err) {
-      console.error("TT Info Error:", err.message);
-      await store.react("❌");
-      reply("❌ Error: " + err.message);
-    }
-  }
-);
-
-// === BONUS: TikTok Audio Only ===
-cmd(
-  {
-    pattern: "ttaudio",
-    alias: ["tiktoka", "tta"],
-    desc: "Download TikTok audio only",
-    react: "🎵",
-    category: "downloader",
-    filename: __filename,
-  },
-  async (conn, m, store, { args, from, reply }) => {
-    try {
-      if (!args[0] || !/tiktok\.com/.test(args[0])) {
-        return reply("❌ *Please provide a valid TikTok URL*\n\nExample: .ttaudio https://tiktok.com/@user/video/xxxx");
-      }
-
-      const url = args[0];
-      await store.react("⌛");
-      reply("⏳ *Extracting audio from TikTok video...*");
-      
-      const result = await tiktokCrypto(url);
-      
-      if (!result.audio) {
-        return reply("❌ *No audio available for this video*");
-      }
-      
-      const audioCaption = 
-`*╭┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*
-*┇▸* 🎵 *TIKTOK AUDIO ONLY*
-*┇▸* 📌 Title: ${result.title}
-*┇▸* 👤 Author: @${result.author}
-*┇▸* 🎧 Format: MP3
-*┇▸* 👑 MUZAMMIL-MD
-*╰┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉┉━┈⟢*`;
-
-      await conn.sendMessage(
-        from,
-        {
-          audio: { url: result.audio },
-          mimetype: "audio/mpeg",
-          caption: audioCaption
-        },
-        { quoted: m }
-      );
-      
-      await store.react("✅");
-      
-    } catch (err) {
-      console.error("TT Audio Error:", err.message);
-      await store.react("❌");
-      reply("❌ Error: " + err.message);
-    }
-  }
-);
+});
