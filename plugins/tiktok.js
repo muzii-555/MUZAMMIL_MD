@@ -29,7 +29,7 @@ async (conn, mek, m, { from, q, reply }) => {
     // 🔐 Secure Base64 Encode
     const encodedUrl = Buffer.from(q).toString("base64");
 
-    const api = `https://arslanmd-api.vercel.app/api/ttdl?url=${encodedUrl}`;
+    const api = `https://arslan-apis.vercel.app/download/tiktokdl?url=${encodedUrl}`;
     const { data } = await axios.get(api);
 
     if (!data || data.status !== true || !data.result) {
